@@ -68,6 +68,11 @@ const browser = await launch();
   check('Space counts to 33', s.count === 33 && (await shown(page)) === '33');
   check('the 33rd count stops under the dome', s.d > 32 * BAY && s.d < 32.5 * BAY + 8, `d ${s.d.toFixed(2)} m`);
   check('the gloss names the next phrase', (await page.textContent('#gloss')) === 'Next: Alhamdulillah');
+  await page.waitForTimeout(4000);
+  const rose = await page.evaluate(() => window.__hall.rose);
+  check('the rose is finished on arrival, and named', rose.laid > 1 && rose.shown === rose.today
+    && (await page.getAttribute('#rose', 'class')).includes('shown'), `${rose.name}, laid ${rose.laid.toFixed(2)}`);
+  check('and the gaze rises to it', (await state(page)).tilt > 0.9, `tilt ${(await state(page)).tilt.toFixed(2)} rad`);
   await shot(page, '02-arrived');
 
   await page.mouse.move(640, 2);
@@ -82,6 +87,8 @@ const browser = await launch();
   s = await state(page);
   check('count 34 starts a new approach', s.count === 34 && Math.abs(s.d - BAY) < 0.01, `d ${s.d.toFixed(3)} m`);
   check('with the next phrase', (await page.textContent('#phrase')) === 'Alhamdulillah' && (await shown(page)) === '1');
+  const next = await page.evaluate(() => window.__hall.rose);
+  check('the next round brings the next rose, still bare', next.shown === next.today + 1 && next.laid < 0.15, `${next.name}, laid ${next.laid.toFixed(2)}`);
 
   await page.mouse.move(1279, 430);
   await page.waitForTimeout(2500);
@@ -185,6 +192,26 @@ const browser = await launch();
   check('a swipe turns the head and does not count', s.count === 3 && s.yaw > 0.3, `yaw ${s.yaw.toFixed(2)} rad, count ${s.count}`);
   await shot(page, '07-phone-swipe');
   check('no console errors on the phone', log.length === 0, log.join(' | '));
+  await ctx.close();
+}
+
+// ---- Reduced motion: no glide, and the gaze stays where you left it -----------------------
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: 'reduce' });
+  const page = await ctx.newPage();
+  const log = collectConsole(page);
+  await page.goto(url);
+  await ready(page);
+  await page.mouse.move(640, 400);
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(50);
+  let s = await state(page);
+  check('with reduced motion a count cuts straight to the next bay', Math.abs(s.d - BAY) < 1e-6, `d ${s.d.toFixed(3)} m`);
+  for (let i = 1; i < 33; i++) await page.keyboard.press('Space');
+  await page.waitForTimeout(3000);
+  s = await state(page);
+  check('and the gaze doesn\'t rise on arriving', s.count === 33 && s.tilt < 0.01, `tilt ${s.tilt.toFixed(3)}`);
+  check('no console errors with reduced motion', log.length === 0, log.join(' | '));
   await ctx.close();
 }
 

@@ -12,7 +12,7 @@ import { aisles } from '../layout.js';
 import { LANTERNS } from '../config.js';
 
 export class Qibla {
-  constructor({ hall, support, arch, qibla, look, lines, halfWidth, supportGeometry, plaster }) {
+  constructor({ hall, support, arch, qibla, look, lines, halfWidth, supportGeometry, plaster, rose }) {
     this.group = new THREE.Group();
     const m = new THREE.Matrix4();
 
@@ -48,13 +48,14 @@ export class Qibla {
     );
     ceiling.position.y = hall.ceiling;
 
+    // The dome carries the rose: `rose` holds its textures and how far its laying has come.
     const dome = new THREE.Mesh(domeGeometry(qibla), litMaterial(new THREE.MeshStandardMaterial({
       color: look.plaster, roughness: 0.94, vertexColors: true, side: THREE.BackSide,
-    })));
+    }), 'dome', rose));
     dome.position.set(0, hall.ceiling, hall.transverse / 2);
 
     this.oculus = new THREE.MeshBasicMaterial({ color: 0xfff6e6, fog: false });
-    const oculus = new THREE.Mesh(new THREE.CircleGeometry(0.55, 32).rotateX(Math.PI / 2), this.oculus);
+    const oculus = new THREE.Mesh(new THREE.CircleGeometry(qibla.oculus, 32).rotateX(Math.PI / 2), this.oculus);
     oculus.position.set(0, hall.ceiling + qibla.dome - 0.05, hall.transverse / 2);
 
     const wallMaterial = litMaterial(new THREE.MeshStandardMaterial({ color: look.plaster, roughness: 0.94 }), 'wall');

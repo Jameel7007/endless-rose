@@ -4,7 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#eee3d1">
-  <title>Endless Rose · greybox</title>
+  <title>Endless Rose</title>
+  <meta name="description" content="An endless prayer hall for dhikr: each count carries you one bay toward the mihrab, the light keeps the prayer times where you are, and a new rose is laid in the dome every round.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://jameel7007.github.io/endless-rose/">
+  <meta property="og:title" content="Endless Rose">
+  <meta property="og:description" content="An endless prayer hall for dhikr. Each count carries you one bay toward the mihrab; the light keeps the prayer times; a new rose is laid in the dome every round.">
+  <meta property="og:image" content="https://jameel7007.github.io/endless-rose/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Looking up into a dome laid with a 16-fold zellige rose in indigo, turquoise and gold, an oculus at its centre and a lantern hanging below, in late-afternoon light.">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23b8862f'%3E%3Crect x='8' y='8' width='16' height='16'/%3E%3Crect x='8' y='8' width='16' height='16' transform='rotate(45 16 16)'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,13 +22,13 @@
   <link rel="stylesheet" href="./src/style.css">
 </head>
 <body>
-  <canvas id="hall" aria-label="An endless prayer hall in plain plaster: rows of columns and horseshoe arches, with a nave leading to a glowing mihrab"></canvas>
+  <canvas id="hall" aria-label="An endless prayer hall of plaster columns and horseshoe arches, lit by the hour of the day, with a nave leading to a glowing mihrab under a dome"></canvas>
   <div id="fade" aria-hidden="true"></div>
 
   <header class="top">
     <div class="brand">
       <span class="name">Endless Rose</span>
-      <span class="tag" id="status">Greybox · T-plan</span>
+      <span class="tag" id="status">An endless prayer hall</span>
     </div>
     <div class="controls">
       <div class="seg" role="group" aria-label="Mihrab">
@@ -54,6 +64,7 @@
     <p id="phrase" class="phrase">SubhanAllah</p>
     <p id="gloss" class="gloss">Glory be to God</p>
     <p class="count" aria-live="polite"><span id="n">0</span> <span id="of" class="of">/ 33</span></p>
+    <p id="rose" class="rose-name" aria-live="polite"></p>
     <p id="hint" class="hint"></p>
   </section>
 

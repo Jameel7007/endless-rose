@@ -3,7 +3,8 @@
 // through openings in the ceiling where it truly stands, and the hall keeps the prayer times.
 import * as THREE from 'three';
 import { ARCH, HALL, LOOK, MOTION, PHRASES, QIBLA, SKY, SUPPORT, VIEW } from './config.js';
-import { arriveCut, arriveStop, spring, step } from './motion.js';
+import { arriveCut, arriveStop, spring, step, withinRound } from './motion.js';
+import { Roses, dayIndex } from './rose/rose.js';
 import { arcadeBayGeometry, supportGeometry } from './hall/pieces.js';
 import { Field } from './hall/field.js';
 import { Lanterns } from './hall/lanterns.js';
@@ -18,6 +19,7 @@ import { Fader } from './fader.js';
 import { Input } from './input.js';
 import { Overlay } from './overlay.js';
 import { LightPanel } from './lightpanel.js';
+import { Quality } from './quality.js';
 
 const canvas = document.getElementById('hall');
 let renderer;
@@ -50,9 +52,17 @@ const field = new Field(HALL, geometries, plaster);
 const halfWidth = Math.max(...field.lines) + HALL.aisle / 2;
 const lanterns = new Lanterns(HALL, field.lines, LOOK);
 const surfaces = new Surfaces(HALL, LOOK, halfWidth + 2);
+
+// The rose in the dome: a new one every round, starting from today's.
+const roses = new Roses(matchMedia('(pointer: coarse)').matches ? 1024 : 2048,
+  Math.min(8, renderer.capabilities.getMaxAnisotropy()));
+const roseUniforms = { uRose: { value: roses.colour }, uRoseOrder: { value: roses.order }, uRoseProgress: { value: 0 } };
+const today = dayIndex();
+const finalStop = arriveStop(MOTION.round, MOTION, HALL, QIBLA);
+
 const qibla = new Qibla({
   hall: HALL, support: SUPPORT, arch: ARCH, qibla: QIBLA, look: LOOK,
-  lines: field.lines, halfWidth, supportGeometry: geometries.support, plaster,
+  lines: field.lines, halfWidth, supportGeometry: geometries.support, plaster, rose: roseUniforms,
 });
 const openings = new Openings(HALL, SKY, field.lines,
   litMaterial(new THREE.MeshStandardMaterial({ color: LOOK.ceiling, roughness: 0.95, side: THREE.BackSide })));
@@ -82,7 +92,9 @@ function light(sky, look, base, cut) {
 
   hallUniforms.uSunDir.value.fromArray(sky.dir);
   setLinear(hallUniforms.uSunColor.value, look.sun).multiplyScalar(look.sunI);
-  hallUniforms.uLanternColor.value.set(LOOK.lantern).multiplyScalar(look.lantern * SKY.lanternLight);
+  // Lamplight on the plaster only from dusk to dawn; by day the lanterns just glow.
+  const lamplight = Math.min(1, Math.max(0, (look.lantern - 0.3) / 0.25));
+  hallUniforms.uLanternColor.value.set(LOOK.lantern).multiplyScalar(look.lantern * lamplight * SKY.lanternLight);
   hallUniforms.uParity.value = ((base % 2) + 2) % 2;
   hallUniforms.uDome.value.set(0, HALL.ceiling, cut + HALL.transverse / 2);
 
@@ -109,7 +121,7 @@ function count() {
   state.target = next.target;
   if (next.restart) {
     // Back to the start of the nave for the next phrase, hidden in a wash of light.
-    fader.start(() => { d = reduced.matches ? state.target : 0; v = 0; }, MOTION.fadeOut, MOTION.fadeIn);
+    fader.start(() => { d = reduced.matches ? state.target : 0; v = 0; tilt = 0; }, MOTION.fadeOut, MOTION.fadeIn);
   } else if (reduced.matches) {
     // No glide: the hall repeats bay by bay, so a cut of one bay is barely visible.
     d = state.target;
@@ -147,8 +159,14 @@ overlay.show(state);
 
 // ---- Frame -----------------------------------------------------------------------------
 
+// Fewer pixels on devices that can't keep up (src/quality.js).
+const quality = new Quality(Math.min(devicePixelRatio, 2), ratio => {
+  renderer.setPixelRatio(ratio);
+  renderer.setSize(innerWidth, innerHeight);
+});
+
 function resize() {
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(quality.ratio);
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.fov = camera.aspect < 1 ? VIEW.fovPortrait : VIEW.fovLandscape;
@@ -158,16 +176,44 @@ addEventListener('resize', resize);
 resize();
 
 const pitch0 = (VIEW.pitch * Math.PI) / 180;
+const tiltUp = (VIEW.arriveTilt * Math.PI) / 180;
 let last = performance.now();
 let ready = false;
 let sky;
+let tilt = 0;       // the rise of the gaze on arriving under the dome
+let aheadLaid = 0;  // in Ahead mode the rose is laid with the count instead of the walk
+
+/**
+ * The rose's laying: in Arrive mode it follows the walk down the nave, so the last tile is set
+ * as you stop under the dome; a new rose is drawn while the dome is still bare. On arriving,
+ * the gaze rises to it (not with reduced motion).
+ */
+function layRose(dt) {
+  const n = withinRound(state.count, MOTION.round);
+  const index = today + (state.count === 0 ? 0 : Math.floor((state.count - 1) / MOTION.round));
+  let laid;
+  if (state.mode === 'arrive') {
+    laid = Math.min(1, Math.max(0, d / finalStop));
+  } else {
+    aheadLaid += (n / MOTION.round - aheadLaid) * (1 - Math.exp(-dt / 0.8));
+    laid = aheadLaid;
+  }
+  roseUniforms.uRoseProgress.value = laid * 1.01; // a little past 1, so the last tile is set
+  if (index !== roses.wanted && (laid < 0.02 || state.mode === 'ahead')) roses.show(index);
+  const arrived = state.mode === 'arrive' && n === MOTION.round && d > finalStop - 2.5;
+  tilt += ((arrived && !reduced.matches ? tiltUp : 0) - tilt) * (1 - Math.exp(-dt / VIEW.tiltSmoothing));
+  overlay.rose(arrived && roses.shown === index ? roses.name : '');
+}
 
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const raw = (now - last) / 1000;
+  const dt = Math.min(0.05, raw);
   last = now;
+  quality.frame(raw);
   fader.update(dt);
   if (!fader.holding) [d, v] = spring(d, v, state.target, MOTION.stiffness, dt);
   input.update(dt);
+  layRose(dt);
 
   // The floating origin: shift the world back by whole bays so the camera stays in bay 0.
   const base = Math.floor(d / HALL.bay);
@@ -183,7 +229,7 @@ function frame(now) {
   panel.show(sky);
 
   camera.position.set(0, VIEW.eye, local);
-  camera.rotation.set(pitch0 + input.pitch, Math.PI + input.yaw, 0); // yaw π: face +z, the qibla
+  camera.rotation.set(Math.min(1.45, pitch0 + input.pitch + tilt), Math.PI + input.yaw, 0); // yaw π: face +z, the qibla
   renderer.render(scene, camera);
 
   if (!ready) {
@@ -198,7 +244,13 @@ requestAnimationFrame(frame);
 if (import.meta.env.DEV) {
   window.__hall = {
     get state() {
-      return { ...state, d, base: Math.floor(d / HALL.bay), yaw: input.yaw, pitch: input.pitch, fade: fader.level };
+      return { ...state, d, base: Math.floor(d / HALL.bay), yaw: input.yaw, pitch: input.pitch, fade: fader.level, tilt };
+    },
+    get rose() {
+      return { laid: roseUniforms.uRoseProgress.value, shown: roses.shown, name: roses.name, today };
+    },
+    get ratio() {
+      return quality.ratio;
     },
     get sky() {
       return { altitude: sky.altitude, period: sky.period, preview: clock.preview, place: clock.place, qibla: sky.qibla };

@@ -334,6 +334,22 @@ button:focus-visible {
   color: var(--muted);
 }
 
+.rose-name {
+  height: 0;
+  overflow: visible;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 1.6s var(--ease);
+}
+
+.rose-name.shown {
+  opacity: 1;
+  transition-delay: 1.2s;
+}
+
 .hint {
   margin-top: 12px !important;
   font-size: 10px;
@@ -380,5 +396,5 @@ button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hint, .seg button { transition: none; }
+  .hint, .seg button, .rose-name { transition: none; }
 }

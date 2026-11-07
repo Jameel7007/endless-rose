@@ -39,6 +39,7 @@ export const QIBLA = {
   rise: 0.25,         // the mihrab's horseshoe
   dome: 4.0,          // radius; it covers the bay in front of the mihrab
   stopBeforeDome: 3.0, // the last count stops this far before the dome's centre, 7 m from the wall
+  oculus: 0.35,       // radius of the opening at the dome's crown
 };
 
 export const MOTION = {
@@ -60,6 +61,8 @@ export const VIEW = {
   dead: 0.12,         // desktop: centre of the screen where the pointer doesn't turn the head
   swipe: 0.004,       // touch: radians of turn per pixel of swipe
   gazeSmoothing: 0.45,
+  arriveTilt: 63,     // on arriving under the dome the gaze rises this far: the whole rose in view
+  tiltSmoothing: 1.6,
 };
 
 export const LOOK = {

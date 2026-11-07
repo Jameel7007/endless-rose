@@ -22,7 +22,7 @@ export const hallUniforms = {
   uLanternY: { value: new THREE.Vector2(LANTERNS.nave, LANTERNS.side) },
   uDome: { value: new THREE.Vector3() },           // centre of the dome's base
   uDomeR: { value: QIBLA.dome },
-  uOculus: { value: new THREE.Vector2(HALL.ceiling + QIBLA.dome, 0.55) }, // height, radius
+  uOculus: { value: new THREE.Vector2(HALL.ceiling + QIBLA.dome, QIBLA.oculus) }, // height, radius
   uTransverse: { value: HALL.transverse },
 };
 
@@ -122,7 +122,8 @@ float hallLamp(vec3 p, vec3 n, vec3 lamp) {
 // lanterns and the large lamp under the dome. Each lantern's light fades to nothing by the
 // distance at which a nearer lantern takes its place in the sum, so the light has no seams.
 vec3 hallLanterns(vec3 p, vec3 n) {
-  if (dot(uLanternColor, vec3(1.0)) < 1e-4) return vec3(0.0);
+  // None by day (main.js sends black), and none past where the haze would hide it anyway.
+  if (dot(uLanternColor, vec3(1.0)) < 1e-4 || distance(p, cameraPosition) > 70.0) return vec3(0.0);
   float sum = 0.0;
   float i0 = floor(p.z / uBay - 0.5);
   for (int k = -1; k < 3; k++) {
@@ -176,6 +177,27 @@ const CEILING = /* glsl */`
 }
 `;
 
+// The rose in the dome (src/rose/rose.js). The direction of a point from the dome's centre gives
+// its place in the medallion, equidistant from the crown: the medallion's centre at the oculus, its
+// rim at the dome's foot. A tile shows once the laying has passed its place in the order, and laid
+// tiles take a glaze.
+const DOME_COMMON = /* glsl */`
+uniform sampler2D uRose, uRoseOrder;
+uniform float uRoseProgress;
+`;
+
+const DOME = /* glsl */`
+  float hallGlaze = 0.0;
+  {
+    vec3 d = normalize(vHall - uDome);
+    float theta = acos(clamp(d.y, -1.0, 1.0));
+    vec2 uv = 0.5 + 0.5 * min(theta / (0.5 * PI), 1.0) * d.xz / max(length(d.xz), 1e-5);
+    float order = texture2D(uRoseOrder, uv).r * 255.0 / 254.0;
+    hallGlaze = 1.0 - smoothstep(uRoseProgress - 0.004, uRoseProgress, order);
+    diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uRose, uv).rgb * vColor.rgb, hallGlaze);
+  }
+`;
+
 // Large flat walls shade by height per pixel: their few big triangles can't carry vertex shading.
 const WALL = /* glsl */`
   diffuseColor.rgb *= (0.74 + 0.26 * smoothstep(0.0, 1.2, vHall.y)) * (1.0 - 0.3 * smoothstep(uCeiling - 1.1, uCeiling, vHall.y));
@@ -184,7 +206,9 @@ const WALL = /* glsl */`
 const LIGHT = /* glsl */`
 {
   vec3 hallN = inverseTransformDirection(normal, viewMatrix);
-  vec3 hallLight = uSunColor * (max(dot(hallN, uSunDir), 0.0) * hallSun(vHall)) + hallLanterns(vHall, hallN);
+  vec3 hallLight = hallLanterns(vHall, hallN);
+  float hallFacing = max(dot(hallN, uSunDir), 0.0);
+  if (hallFacing > 0.0 && dot(uSunColor, vec3(1.0)) > 1e-4) hallLight += uSunColor * (hallFacing * hallSun(vHall));
   reflectedLight.directDiffuse += hallLight * BRDF_Lambert(material.diffuseColor);
 }
 `;
@@ -192,11 +216,12 @@ const LIGHT = /* glsl */`
 /**
  * Give a MeshStandardMaterial the hall's light. `kind` is 'plaster', 'floor' (adds joints and
  * shading round the column feet), 'ceiling' (adds the openings and shading along the walls) or
- * 'wall' (shading by height, for big flat walls).
+ * 'wall' (shading by height, for big flat walls) or 'dome' (the rose; give `extra` its uniforms
+ * uRose, uRoseOrder and uRoseProgress).
  */
-export function litMaterial(material, kind = 'plaster') {
+export function litMaterial(material, kind = 'plaster', extra = {}) {
   material.onBeforeCompile = shader => {
-    Object.assign(shader.uniforms, hallUniforms);
+    Object.assign(shader.uniforms, hallUniforms, extra);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vHall;')
       .replace('#include <project_vertex>', `#include <project_vertex>
@@ -205,11 +230,15 @@ export function litMaterial(material, kind = 'plaster') {
           hallPos = instanceMatrix * hallPos;
         #endif
         vHall = (modelMatrix * hallPos).xyz;`);
-    const surface = { floor: FLOOR, ceiling: CEILING, wall: WALL }[kind] ?? '';
+    const surface = { floor: FLOOR, ceiling: CEILING, wall: WALL, dome: DOME }[kind] ?? '';
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${COMMON}`)
+      .replace('#include <common>', `#include <common>\n${COMMON}${kind === 'dome' ? DOME_COMMON : ''}`)
       .replace('#include <color_fragment>', `#include <color_fragment>\n${surface}`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${LIGHT}`);
+    if (kind === 'dome') {
+      shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>',
+        '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.4, hallGlaze);');
+    }
   };
   // Every hall material patches the same base shader, so each kind needs its own program key.
   material.customProgramCacheKey = () => `hall-${kind}`;

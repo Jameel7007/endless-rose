@@ -2,8 +2,8 @@
 
 An endless prayer hall in plain plaster. You move down the central nave toward the mihrab one bay
 per count of dhikr. The light follows the real day where you are: the sun comes in through
-openings in the ceiling where it truly stands, and the hall keeps the prayer times. There is no
-ornament yet.
+openings in the ceiling where it truly stands, and the hall keeps the prayer times. Each round of
+33 ends under the dome, where a rose of glazed tile has been laid while you walked.
 
 ## The space: a T-plan hypostyle
 
@@ -134,6 +134,59 @@ turn light on dark.
 - **Glows**: camera-facing squares with their own fog.
 - **Tone mapping**: Khronos PBR Neutral.
 
+## The rose in the dome
+
+**Where the roses come from.** `scripts/import-roses.mjs` runs the three 16-fold medallions of the
+Rosette project (Moorish, Lee and polar: 2,041, 2,561 and 3,065 finished tiles) and writes their
+tiles to `src/rose/data/*.bin`, about 200 KB in all. The format (`src/rose/format.js`) is a short
+header, then one record per tile (glaze, point count), then every point as two 16-bit integers in
+hundredths of a unit. The roses are made once by the script, not at load.
+
+**Drawing a rose** (`src/rose/rose.js`). When a round begins, the next rose is drawn into two
+canvases:
+- **Glazes**: the mortar first, then every tile in its colourway's colour, each a shade lighter or
+  darker than the next, as real zellige is.
+- **Laying order**: each tile's place in the order, written as a shade of red. Every tile is first
+  drawn with a wide outline, then all of them filled, so the mortar between two tiles is laid with
+  them and never ahead of them.
+
+Both canvases become textures for the dome. They are 2048 pixels square on desktops and 1024 on phones.
+
+**Mapping it onto the dome.** A point's direction from the dome's centre gives its place in the
+medallion, measured from the crown: the medallion's centre at the oculus, its rim at the dome's
+foot.
+
+**Laying it.** The order runs from the rim up to the crown, ring by ring, sweeping round within each
+ring (`layingOrder()`). It is worked out from the tiles' positions, not from the designs' own
+layers, so all three designs are laid alike.
+
+In Arrive mode the laying follows how far you have walked, so the rose is laid as you go: through
+the nave's arch you can watch the rim rings appear, and the last tile at the crown is set as you
+stop. The shader shows a tile once the laying passes its place in the order, and gives laid tiles a
+glaze (less rough than plaster).
+
+**Arriving.** Your gaze rises to about 67°, which brings the whole dome into view, from its far rim
+to its near rim. The rose's name appears under the count. With reduced motion turned on, the gaze
+stays where you left it.
+
+**Which rose.** `roseFor(index)` changes the design every round and turns the six colourways, so
+all 18 pairings come once in 18 rounds. The index starts at the number of days since 1970, so each
+day begins on a different rose.
+
+## Keeping it smooth on phones
+
+`src/quality.js` times frames over windows of 1.5 seconds:
+- **Too slow** (under about 48 fps): it draws fewer pixels, stepping the pixel ratio down from 2 to
+  1.6, 1.3, then 1.
+- **No better after a step**: if a step down brings no real speed-up, it undoes it and stops.
+  Something else is setting the pace, such as an iPhone in Low Power Mode, which holds 30 fps
+  whatever is drawn.
+- **Smooth for a while**: after four smooth windows in a row it steps back up. It never steps
+  back into a level that was too slow within the last minute.
+
+The shader also skips light that couldn't be seen: no lamplight on the plaster by day, none past
+70 m where the haze hides it, and no sun after dark.
+
 ## Files
 
 | File | What it does |
@@ -151,37 +204,44 @@ turn light on dark.
 | `src/sky/sun.js` | Sun position, prayer times, qibla bearing (no three.js; tested) |
 | `src/sky/look.js` | The look of each hour (no three.js; tested) |
 | `src/sky/clock.js`, `place.js` | Now or a preview; where the times are for |
+| `src/rose/format.js` | The rose files, and the laying order (no three.js; tested) |
+| `src/rose/rose.js` | Choosing the round's rose and drawing it into the dome's textures |
+| `src/quality.js` | Fewer pixels when frames run slow (no three.js; tested) |
+| `scripts/import-roses.mjs` | Makes `src/rose/data/*.bin` from the Rosette project |
+| `scripts/smoke.mjs`, `views.mjs`, `perf.mjs` | Real-input checks, screenshots, frame rate |
 | `src/input.js`, `overlay.js`, `fader.js` | Input, the words on screen, the wash of light |
 | `src/lightpanel.js` | The Light panel and the prayer-time line under the name |
 | `src/main.js` | Puts it together and runs the frame loop |
 
 ## Checking it
 
-- `npm test` runs 16 tests: layout, motion, the sun against adhan-js, the look of the hours, and the
-  openings.
+- `npm test` runs 23 tests:
+  - the layout of the hall, and the counting and glide
+  - the sun against adhan-js, the look of the hours, and the ceiling openings
+  - the rose files and their laying order, and that every rose comes round
+  - the resolution governor
 - `npm run smoke` needs the dev server on port 5197. It does a cold load in headless Chrome, driven
   only by real clicks, keys, taps and swipes, and runs 28 checks, including the Light panel. Its
   screenshots go in `capture/smoke/`. It reads `window.__hall` (dev builds only) to measure what
   the input did; it never drives it.
 
-Measured on an M2 Pro (headless Chrome, frame limit off):
-- 1280×800: about 290 fps looking down the nave, 220 fps looking sideways.
-- 2560×1600: about 185 and 160 fps.
-- About 660k triangles in 35 draw calls.
-
-The light layer cost about a quarter of the frame rate. It has not been measured on a phone yet.
+Measured on an M2 Pro (headless Chrome, frame limit off, at noon and at night): between about 150
+and 240 fps at 1280×800, 2560×1600 and phone size. That is about 660k triangles in 35 draw calls,
+and the numbers vary by a few dozen fps from run to run. `node scripts/perf.mjs` measures it;
+`T=21:00` before it measures at night. It hasn't been measured on a real phone: the resolution
+governor is the safety net.
 
 ## Terms worth knowing
 
 Floating origin, instancing, draw call, frustum culling, critically damped spring, exponential fog,
 ambient occlusion (baked and analytic), tone mapping, seeded procedural generation, analytic
 visibility (instead of shadow maps), penumbra, equation of time, solar declination, hour angle,
-great-circle bearing.
+great-circle bearing, azimuthal equidistant projection, binary file format, adaptive resolution.
 
-## What this greybox is for deciding
+## Decisions
 
-- **Arrive or Ahead**: decided on 2026-10-29. Arrive is the default, so each phrase ends at the
-  mihrab; Ahead stays in the toggle.
-- **Pace**: is one bay per count right? Is the glide too slow or too quick? (`MOTION.stiffness`,
-  `HALL.bay`)
-- **Space**: the nave's width, the column height, the haze's depth.
+- **Arrive or Ahead** (decided on 2026-10-29): Arrive is the default, so each round ends at the
+  mihrab under its rose. Ahead stays in the toggle.
+- **Still to judge in use:**
+  - the pace: one bay per count, a glide of about two seconds (`MOTION.stiffness`, `HALL.bay`)
+  - the light and the roses on a real phone

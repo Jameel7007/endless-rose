@@ -7,7 +7,7 @@ export class Overlay {
   constructor(phrases, round, { onMode, onReset }) {
     this.phrases = phrases;
     this.round = round;
-    this.el = { phrase: $('#phrase'), gloss: $('#gloss'), n: $('#n'), of: $('#of'), hint: $('#hint') };
+    this.el = { phrase: $('#phrase'), gloss: $('#gloss'), n: $('#n'), of: $('#of'), hint: $('#hint'), rose: $('#rose') };
     this.el.of.textContent = `/ ${round}`;
     this.modes = [...document.querySelectorAll('[data-mode]')];
     // A mouse click leaves focus on the button, and Space would then press it again
@@ -20,6 +20,14 @@ export class Overlay {
     this.el.hint.textContent = touch
       ? 'Tap to count · swipe to look around'
       : 'Click or press Space to count · move the pointer to look around';
+  }
+
+  /** The name of the rose overhead, shown on arriving under it; '' hides it. */
+  rose(name) {
+    if (name === this.roseName) return;
+    this.roseName = name;
+    if (name) this.el.rose.textContent = name;
+    this.el.rose.classList.toggle('shown', Boolean(name));
   }
 
   show({ count, mode }) {
