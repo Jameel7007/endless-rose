@@ -1,7 +1,9 @@
-# How Endless Rose works (greybox)
+# How Endless Rose works
 
 An endless prayer hall in plain plaster. You move down the central nave toward the mihrab one bay
-per count of dhikr. There is no ornament yet: this stage is only for judging the space and the pace.
+per count of dhikr. The light follows the real day where you are: the sun comes in through
+openings in the ceiling where it truly stands, and the hall keeps the prayer times. There is no
+ornament yet.
 
 ## The space: a T-plan hypostyle
 
@@ -62,20 +64,75 @@ per count of dhikr. There is no ornament yet: this stage is only for judging the
 - **Touch**: a swipe turns the head and a tap counts. A press that moves more than 10 px is a swipe.
 - **Keys**: Space or Enter counts, the arrow keys look around, Home looks straight ahead again.
 
-## Lighting the greybox
+## Light that keeps prayer time
 
-There are no textures and no shadow maps. Instead:
-- A **hemisphere light**: warm light from above, and a softer bounce from below that lights the ceiling
-  and the undersides of the arches.
-- One **directional light** from the upper side, to show the shapes.
-- **Baked vertex shading**: each piece darkens near the floor and the ceiling, written into its
-  vertex colours (`finish()` in `src/hall/pieces.js`).
-- **Floor and ceiling shaders** work out the nearest column from the grid's maths and darken around it
-  (`src/hall/surfaces.js`). That gives contact shadows for 1,400 columns for a few lines of maths
-  per pixel.
-- **Glows** are camera-facing squares with their own fog (`src/hall/glow.js`). The mihrab's glow lies
-  flat on the wall and fades as you come close, handing over to the lit niche.
-- **Tone mapping**: Khronos PBR Neutral, which keeps the plaster's colour honest.
+**The clock** (`src/sky/clock.js`) shows either now or a moment you are previewing. The Light panel's
+slider sets the preview, and `?t=17:30` in the address does the same.
+
+**The place** (`src/sky/place.js`). With no choice made, the place is estimated from the browser's
+time zone: its main city, from a table of about a hundred zones. That needs no permission.
+**Use my location** asks the device once, rounds the answer to about a kilometre, and saves it in
+this browser only. Nothing is sent anywhere. Browsers allow location only on secure (https) pages
+and on localhost, so it won't work on a phone opened over the local network. `?at=lat,lon` sets a
+place for testing.
+
+**The sun and the prayer times** (`src/sky/sun.js`) are plain maths, with no library:
+- The sun's position comes from its declination and the equation of time, using the same
+  low-precision formulas as PrayTimes.org. They are good to about a minute this century.
+- Each prayer is the moment the sun reaches a certain angle:
+  - **Fajr**: 18° below the horizon (Muslim World League; other methods use 15° to 19.5°).
+  - **Sunrise and Maghrib**: 0.833° below the horizon (the sun's disc plus refraction).
+  - **Dhuhr**: just after noon.
+  - **Asr**: when a shadow is as long as its object plus its noon shadow (twice as long for Hanafi).
+  - **Isha**: 17° below the horizon (or 90 minutes after Maghrib for Umm al-Qura).
+  - Far north in summer, Fajr and Isha are held at the middle of the night.
+- `tests/sun.test.mjs` checks 192 times against adhan-js (a well-tested library, used only to make
+  the reference file): 178 match to the minute and the rest are one minute off.
+
+**The hall faces the real qibla.** The nave points at the Kaaba's bearing from your place, so the sun
+keeps its true direction: from Mexico City the nave faces north-east (47°), so the morning sun comes
+in from ahead and to the right.
+
+**Openings in the ceiling** (`isOpen()` in `src/layout.js`): a 1.8 m square in the middle of every
+other bay of every aisle, alternating like a chessboard, each under a 0.6 m deep light well. The
+ceiling's shader simply leaves those squares out, so the sky shows through.
+
+**Sunlight without shadow maps** (`src/hall/light.js`). For each pixel of plaster, the shader follows
+a line from that point toward the sun and asks whether it gets out:
+- It must pass through an opening at the ceiling and again at the top of its well. So low sun (below
+  about 18°) can't get in at all, and the patch of light narrows as the sun sinks.
+- If the line meets an arcade wall above the crowns of the upper arches, where the wall is solid,
+  it is blocked.
+- Under the dome, the only way out is the oculus. That makes the bright ellipse that crawls across
+  the qibla wall through the day.
+- The edges are softened by the sun's real width (half a degree).
+
+It's all arithmetic on the hall's grid, so there are no shadow maps and the cost doesn't grow with
+the number of columns. The trade-off: columns don't cast shadows inside a sunbeam.
+
+**Beams** (`src/hall/beams.js`) are long quads that turn about their own axis to face the camera,
+drawn for openings within 36 m. A beam slanting across the hall stops where it meets the solid top of
+a wall.
+
+**The look of each hour** (`src/sky/look.js`) is a set of key moments by the sun's height: night,
+dawn blues, the rose and gold of sunrise and sunset, the cream of day. Evenings are warmer than
+mornings at the same height. Each key sets the haze, the sky light, the bounce from the floor,
+the sunlight's colour and strength, the beams, the lanterns and the exposure, and the hall blends
+between them.
+
+**Lanterns light the plaster** the same way, from the grid: each pixel adds the nearest lanterns of
+the nave, the nearby side aisles and the transverse aisle, plus the big lamp under the dome. Each
+lantern's light fades to nothing by the distance at which a nearer one takes its place in the sum,
+so there are no seams. They are faint by day and full at night. After sunset the words on screen
+turn light on dark.
+
+**Also, from the greybox:**
+- **Baked vertex shading**: each piece darkens near the floor and the ceiling. The big flat walls do
+  this per pixel instead, because their few big triangles can't carry it.
+- **Contact shadows**: the floor and ceiling shaders work out the nearest column from the grid's maths
+  and darken around it.
+- **Glows**: camera-facing squares with their own fog.
+- **Tone mapping**: Khronos PBR Neutral.
 
 ## Files
 
@@ -88,24 +145,38 @@ There are no textures and no shadow maps. Instead:
 | `src/hall/field.js` | The instanced field of arcades |
 | `src/hall/qibla.js` | Transverse arcade, dome, qibla wall, mihrab |
 | `src/hall/lanterns.js`, `glow.js` | Lanterns, chains and their glow |
-| `src/hall/surfaces.js` | Floor and ceiling, with their shaders |
+| `src/hall/surfaces.js` | Floor and ceiling |
+| `src/hall/light.js` | The shared shader: sun through the openings, lamplight, contact shadows |
+| `src/hall/beams.js` | Light wells and beams |
+| `src/sky/sun.js` | Sun position, prayer times, qibla bearing (no three.js; tested) |
+| `src/sky/look.js` | The look of each hour (no three.js; tested) |
+| `src/sky/clock.js`, `place.js` | Now or a preview; where the times are for |
 | `src/input.js`, `overlay.js`, `fader.js` | Input, the words on screen, the wash of light |
+| `src/lightpanel.js` | The Light panel and the prayer-time line under the name |
 | `src/main.js` | Puts it together and runs the frame loop |
 
 ## Checking it
 
-- `npm test` runs the layout and motion tests (9).
+- `npm test` runs 16 tests: layout, motion, the sun against adhan-js, the look of the hours, and the
+  openings.
 - `npm run smoke` needs the dev server on port 5197. It does a cold load in headless Chrome, driven
-  only by real clicks, keys, taps and swipes: 18 checks, with screenshots in `capture/smoke/`.
-  It reads `window.__hall` (dev builds only) to measure what the input did; it never drives it.
+  only by real clicks, keys, taps and swipes, and runs 28 checks, including the Light panel. Its
+  screenshots go in `capture/smoke/`. It reads `window.__hall` (dev builds only) to measure what
+  the input did; it never drives it.
 
-Measured on an M2 Pro (headless Chrome, frame limit off): about 380 fps at 1280×800 and about 250 fps
-at 2560×1600, drawing about 650k triangles in 30 draw calls. Not yet measured on a phone.
+Measured on an M2 Pro (headless Chrome, frame limit off):
+- 1280×800: about 290 fps looking down the nave, 220 fps looking sideways.
+- 2560×1600: about 185 and 160 fps.
+- About 660k triangles in 35 draw calls.
+
+The light layer cost about a quarter of the frame rate. It has not been measured on a phone yet.
 
 ## Terms worth knowing
 
 Floating origin, instancing, draw call, frustum culling, critically damped spring, exponential fog,
-ambient occlusion (baked and analytic), tone mapping, seeded procedural generation.
+ambient occlusion (baked and analytic), tone mapping, seeded procedural generation, analytic
+visibility (instead of shadow maps), penumbra, equation of time, solar declination, hour angle,
+great-circle bearing.
 
 ## What this greybox is for deciding
 

@@ -63,23 +63,29 @@ export const VIEW = {
 };
 
 export const LOOK = {
-  haze: 0xeee3d1,     // fog and sky: warm morning haze
-  fog: 0.017,         // FogExp2 density; about 95 % hidden at 100 m
   plaster: 0xece4d7,
   floor: 0xd6cab8,
   ceiling: 0xe6ddcf,
-  sky: 0xfff3e2,      // hemisphere light from above
-  ground: 0xc9bca8,   // and the softer bounce from the floor, which lights the ceiling
-  hemi: 2.5,
-  sun: 0xffe3c0,
-  sunIntensity: 1.4,
   lantern: 0xffc46a,
-  lanternGlow: 0.7,
+  lanternGlow: 0.8,
   mihrab: 0xffc873,
   mihrabLight: 6,
   mihrabGlow: 1.5,
-  exposure: 1.0,
 };
+
+// The light of the day. The haze, sky light, sunlight and lanterns for each height of the sun
+// are in src/sky/look.js.
+export const SKY = {
+  opening: 1.8,       // square openings in the ceiling (where: isOpen() in src/layout.js)
+  well: 0.6,          // depth of the light well above each opening
+  solidFrom: 7.6,     // the arcade walls are solid above the crowns of their upper arches
+  beamsWithin: 36,    // beams of light are drawn for openings this close
+  lanternLight: 6.5,  // how strongly the lanterns light the plaster near them
+  method: 'mwl',      // prayer-time method, from METHODS in src/sky/sun.js
+  asr: 'standard',    // or 'hanafi'
+};
+
+export const LANTERNS = { nave: 4.7, side: 4.4 }; // hanging heights
 
 export const PHRASES = [
   ['SubhanAllah', 'Glory be to God'],

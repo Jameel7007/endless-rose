@@ -3,6 +3,7 @@
 // lantern stays put as the camera moves past it.
 import * as THREE from 'three';
 import { aisles, rowZ, visibleRows } from '../layout.js';
+import { LANTERNS } from '../config.js';
 import { cordGeometry, lanternGeometry } from './pieces.js';
 import { Glow } from './glow.js';
 
@@ -13,10 +14,18 @@ export class Lanterns {
     const max = this.aisles.length * (hall.rowsBehind + hall.rowsAhead + 1);
     this.bodies = new THREE.InstancedMesh(lanternGeometry(), new THREE.MeshBasicMaterial({ color: look.lantern }), max);
     this.cords = new THREE.InstancedMesh(cordGeometry(), new THREE.MeshLambertMaterial({ color: 0x6e6155 }), max);
-    this.glow = new Glow(max, { color: look.lantern, intensity: look.lanternGlow, fog: look.fog });
+    this.glow = new Glow(max, { color: look.lantern, intensity: look.lanternGlow, fog: 0.017 });
+    this.body = new THREE.Color(look.lantern);
     this.group = new THREE.Group();
     this.group.add(this.bodies, this.cords, this.glow.mesh);
     this.key = '';
+  }
+
+  /** How lit the lanterns are (0 to 1): faint by day, full at night. */
+  setLight(level, glow, fog) {
+    this.glow.setStrength(glow * (0.2 + 0.8 * level));
+    this.glow.setFog(fog);
+    this.bodies.material.color.copy(this.body).multiplyScalar(0.55 + 0.45 * level);
   }
 
   /** `base` is the real row the camera stands in; `cut` is the transverse arcade's local z. */
@@ -31,7 +40,7 @@ export class Lanterns {
     let n = 0;
     for (const a of this.aisles) {
       const nave = a.width > hall.aisle + 1e-6;
-      const y = nave ? 4.7 : 4.4;
+      const y = nave ? LANTERNS.nave : LANTERNS.side;
       const chain = hall.ceiling - (y + 0.26);
       for (let k = 0; k < v.supports; k++) {
         const i = v.first + k;

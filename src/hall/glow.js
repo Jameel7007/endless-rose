@@ -60,7 +60,17 @@ export class Glow {
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
     }));
+    this.fogScale = fogScale;
     this.mesh.frustumCulled = false; // the quads move in the shader; the base quad's bounds mean nothing
+  }
+
+  /** Brightness, and the haze it fades in (the fog density of the moment). */
+  setStrength(intensity) {
+    this.mesh.material.uniforms.uIntensity.value = intensity;
+  }
+
+  setFog(fog) {
+    this.mesh.material.uniforms.uFog.value = fog * this.fogScale;
   }
 
   set(i, x, y, z, size) {

@@ -18,7 +18,7 @@
   <header class="top">
     <div class="brand">
       <span class="name">Endless Rose</span>
-      <span class="tag">Greybox · T-plan</span>
+      <span class="tag" id="status">Greybox · T-plan</span>
     </div>
     <div class="controls">
       <div class="seg" role="group" aria-label="Mihrab">
@@ -26,9 +26,29 @@
         <button type="button" data-mode="arrive" aria-pressed="true" title="Each round of 33 walks you to the mihrab">Arrive</button>
         <button type="button" data-mode="ahead" aria-pressed="false" title="The qibla wall stays on the horizon">Ahead</button>
       </div>
+      <button type="button" id="light" class="pill" aria-expanded="false" aria-controls="light-panel">Light</button>
       <button type="button" id="reset" class="pill">Reset</button>
     </div>
   </header>
+
+  <section id="light-panel" class="panel" aria-label="Light and prayer times" hidden>
+    <p class="panel-title">The day</p>
+    <p id="place" class="place"></p>
+    <ol id="times" class="times"></ol>
+    <label class="preview">
+      <span>Preview the day <output id="preview-out"></output></span>
+      <input id="preview" type="range" min="0" max="1439" step="1">
+    </label>
+    <div class="row">
+      <button type="button" id="now" class="pill small">Now</button>
+      <button type="button" id="locate" class="pill small">Use my location</button>
+    </div>
+    <p id="place-note" class="note" role="status"></p>
+    <div class="row selects">
+      <label><span>Method</span><select id="method"></select></label>
+      <label><span>Asr</span><select id="asr"><option value="standard">Standard</option><option value="hanafi">Hanafi</option></select></label>
+    </div>
+  </section>
 
   <section class="dhikr">
     <p id="phrase" class="phrase">SubhanAllah</p>

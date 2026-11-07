@@ -108,6 +108,47 @@ const browser = await launch();
   await page.keyboard.press('Space');
   await settle(page);
   check('Space counts again after clicking a button', (await state(page)).count === 1);
+  // The Light panel: open it, drag through the day, come back to now, reckon Asr the Hanafi way.
+  await page.click('#light');
+  check('the Light button opens the panel', await page.isVisible('#light-panel') && (await page.getAttribute('#light', 'aria-expanded')) === 'true');
+  await page.waitForFunction(() => document.querySelector('#times time')?.textContent, null, { timeout: 2000 }); // filled on the next frame
+  const times = await page.$$eval('#times time', ts => ts.map(t => t.textContent));
+  check('the panel lists six times for today', times.length === 6 && times.every(t => /\d/.test(t)), times.join(' '));
+  const sunBefore = (await page.evaluate(() => window.__hall.sky)).altitude;
+  const box = await page.locator('#preview').boundingBox();
+  const value = +(await page.inputValue('#preview'));
+  const thumbX = box.x + 8 + ((box.width - 16) * value) / 1439;
+  const toX = box.x + box.width * (value < 720 ? 0.85 : 0.15);
+  await page.mouse.move(thumbX, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(toX, box.y + box.height / 2, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const previewed = await page.evaluate(() => window.__hall.sky);
+  check('dragging the day slider previews another hour', (await page.textContent('#status')).startsWith('Preview')
+    && previewed.preview !== null && Math.abs(previewed.altitude - sunBefore) > 10,
+    `sun ${sunBefore.toFixed(0)}° → ${previewed.altitude.toFixed(0)}°`);
+  await shot(page, '08-light-panel');
+  await page.click('#now');
+  await page.waitForTimeout(200);
+  check('Now returns to the present', !(await page.textContent('#status')).startsWith('Preview') && await page.isDisabled('#now'));
+  const asrBefore = await page.textContent('#times li[data-p="asr"] time');
+  await page.selectOption('#asr', 'hanafi');
+  await page.waitForTimeout(200);
+  const asrAfter = await page.textContent('#times li[data-p="asr"] time');
+  check('Hanafi reckoning moves Asr later', asrAfter !== asrBefore, `${asrBefore} → ${asrAfter}`);
+  await page.selectOption('#asr', 'standard');
+  await page.keyboard.press('Escape');
+  check('Escape closes the panel', !(await page.isVisible('#light-panel')));
+  await page.mouse.click(640, 400);
+  await page.waitForTimeout(100);
+  check('the hall still counts after the panel', (await state(page)).count === 2);
+  await page.goto(`${url}?t=21:00`);
+  await ready(page);
+  check('after sunset the words turn light', await page.evaluate(() => document.documentElement.hasAttribute('data-dark')));
+  await page.goto(`${url}?t=12:00`);
+  await ready(page);
+  check('by day they are dark', !(await page.evaluate(() => document.documentElement.hasAttribute('data-dark'))));
   check('no console errors on desktop', log.length === 0, log.join(' | '));
   await page.close();
 }

@@ -23,6 +23,28 @@ export function aisles(lines) {
 /** Local z of support row i. Rows sit half a bay off the places where the camera stops. */
 export const rowZ = (i, bay) => (i + 0.5) * bay;
 
+/**
+ * Openings in the ceiling, one at the middle of a bay: every other bay of every aisle,
+ * alternating from aisle to aisle like a chessboard. `aisle` counts outward from the nave (0);
+ * `row` is the real row, local row plus the camera's base row. src/hall/light.js repeats this
+ * rule in GLSL.
+ */
+export const isOpen = (aisle, row) => (((aisle + row) % 2) + 2) % 2 === 0;
+
+/** From x, the distance to the face of the next arcade wall in direction dir (+1 or -1). */
+export function gapToArcade(x, dir, { nave, aisle }, wall = 0.5) {
+  const half = nave / 2;
+  const s = x * dir;
+  let next;
+  if (s < -half) next = -(half + (Math.ceil((-s - half) / aisle) - 1) * aisle);
+  else if (s < half) next = half;
+  else next = half + Math.ceil((s - half) / aisle) * aisle;
+  return next - s - wall / 2;
+}
+
+/** How far an aisle is from the nave: 0 for the nave, then 1, 2… outward on either side. */
+export const aisleIndex = (x, { nave, aisle }) => (Math.abs(x) < nave / 2 ? 0 : Math.floor((Math.abs(x) - nave / 2) / aisle) + 1);
+
 const EPS = 1e-6;
 
 /**
