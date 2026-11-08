@@ -7,7 +7,7 @@ import { arcadeLines, rowZ, visibleRows } from '../layout.js';
 const CHUNK = 6; // arcades per instanced mesh
 
 export class Field {
-  constructor(hall, geometries, material) {
+  constructor(hall, geometries, materials) {
     this.hall = hall;
     this.lines = arcadeLines(hall);
     this.group = new THREE.Group();
@@ -15,8 +15,8 @@ export class Field {
     const rows = hall.rowsBehind + hall.rowsAhead + 1;
     for (let i = 0; i < this.lines.length; i += CHUNK) {
       const xs = this.lines.slice(i, i + CHUNK);
-      const supports = new THREE.InstancedMesh(geometries.support, material, xs.length * rows);
-      const arches = new THREE.InstancedMesh(geometries.bay, material, xs.length * rows);
+      const supports = new THREE.InstancedMesh(geometries.support, materials.support, xs.length * rows);
+      const arches = new THREE.InstancedMesh(geometries.bay, materials.bay, xs.length * rows);
       this.group.add(supports, arches);
       this.chunks.push({ xs, supports, arches });
     }

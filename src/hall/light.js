@@ -1,9 +1,11 @@
 // Light on every plaster surface: the sun through the openings in the ceiling, and the lanterns.
 // Both are worked out in the shader from the hall's grid, with no shadow map and no extra lights,
 // so 1,400 columns can stand in sunbeams and lamplight at the cost of some arithmetic per pixel.
-// Every hall material shares `hallUniforms`; main.js updates them once a frame.
+// The colour layers (src/hall/ornament.js) are painted here too. Every hall material shares
+// `hallUniforms` and `ornamentUniforms`; main.js updates them once a frame.
 import * as THREE from 'three';
 import { HALL, LANTERNS, QIBLA, SKY } from '../config.js';
+import { ORNAMENT_GLSL, ornamentUniforms } from './ornament.js';
 
 export const hallUniforms = {
   uBay: { value: HALL.bay },
@@ -28,9 +30,12 @@ export const hallUniforms = {
 
 const COMMON = /* glsl */`
 varying vec3 vHall;
+varying vec3 vObj;    // the point in the piece's own coordinates
+varying vec2 vCell;   // where the piece (or this instance of it) stands on the floor
 uniform float uBay, uNaveHalf, uAisle, uCeiling, uCut, uWall, uParity, uOpening, uWell, uSolidFrom, uDomeR, uTransverse;
 uniform vec3 uSunDir, uSunColor, uLanternColor, uDome;
 uniform vec2 uLanternY, uOculus;
+${ORNAMENT_GLSL}
 
 // Distance across the hall to the nearest arcade line.
 float hallArcadeDx(float x) {
@@ -66,6 +71,25 @@ float hallOpen(vec2 c, float w) {
   return (1.0 - smoothstep(-w, w, e.x)) * (1.0 - smoothstep(-w, w, e.y));
 }
 
+// The stained glass at the top of each well, where the light passes at c = (x, z): a ruby
+// eight-point star in an amber ring, cobalt and emerald corners, a clear border, and lead between
+// the panes, which the sun draws on the floor.
+vec3 hallGlass(vec2 c) {
+  float dx;
+  hallAisle(c.x, dx);
+  float j = floor(c.y / uBay + 0.5);
+  vec2 q = vec2(dx, c.y - j * uBay) / (0.5 * uOpening);
+  vec2 a = abs(q);
+  float s = ornStar(q);
+  float sq = max(a.x, a.y);
+  vec3 col = s < 0.34 ? vec3(1.0, 0.16, 0.2) : (s < 0.6 ? vec3(1.0, 0.6, 0.16)
+    : (q.x * q.y > 0.0 ? vec3(0.2, 0.36, 1.0) : vec3(0.22, 0.85, 0.42)));
+  col = sq > 0.86 ? vec3(0.95, 0.9, 0.8) : col;
+  float diag = s > 0.6 && sq < 0.86 ? abs(a.x - a.y) : 1.0;
+  float lead = 1.0 - smoothstep(0.012, 0.03, min(min(abs(s - 0.34), abs(s - 0.6)), min(abs(sq - 0.86), diag)));
+  return col * (1.0 - 0.9 * lead) * 1.35;
+}
+
 // From x, the distance to the face of the next arcade wall in direction dir (+1 or -1).
 float hallLineGap(float x, float dir) {
   float s = x * dir;
@@ -77,8 +101,10 @@ float hallLineGap(float x, float dir) {
 }
 
 // How much direct sun reaches p: through an opening and up its well, unless the solid top of an
-// arcade wall stands in the way. Under the dome, only through its oculus.
-float hallSun(vec3 p) {
+// arcade wall stands in the way. Under the dome, only through its oculus. pane is where the light
+// passed the glass at the top of the well (far away when it came through the oculus instead).
+float hallSun(vec3 p, out vec2 pane) {
+  pane = vec2(1e6);
   vec3 L = uSunDir;
   if (L.y < 0.05) return 0.0;
   float t0 = (uCeiling - p.y) / L.y;
@@ -89,6 +115,7 @@ float hallSun(vec3 p) {
     return 1.0 - smoothstep(uOculus.y - 0.02 - 0.0093 * t2, uOculus.y + 0.0093 * t2, r);
   }
   vec2 c1 = p.xz + L.xz * ((uCeiling + uWell - p.y) / L.y);
+  pane = c1;
   float pen = 0.02 + 0.0093 * max(t0, 0.0);          // the sun is half a degree wide
   float vis = hallOpen(c1, pen);
   if (p.y < uCeiling) {
@@ -152,6 +179,9 @@ vec3 hallLanterns(vec3 p, vec3 n) {
 }
 `;
 
+// What each kind of surface looks like. Each sets diffuseColor; hallPolish (0 to 1) makes it less
+// rough, for glazed tile, polished marble and glass mosaic.
+
 const FLOOR = /* glsl */`
 {
   float d = length(vec2(hallArcadeDx(vHall.x), hallRowDz(vHall.z)));
@@ -163,17 +193,88 @@ const FLOOR = /* glsl */`
   vec2 j = (0.5 - abs(fract(q) - 0.5)) * slab;
   vec2 w = fwidth(vHall.xz);
   float line = 1.0 - smoothstep(0.0, 0.004 + 1.5 * max(w.x, w.y), min(j.x, j.y));
-  line *= 1.0 - smoothstep(12.0, 45.0, distance(vHall, cameraPosition));
-  diffuseColor.rgb *= ao * (1.0 - 0.13 * line);
+  float far = smoothstep(14.0, 38.0, distance(vHall, cameraPosition));
+  vec3 stone = diffuseColor.rgb * (1.0 - 0.13 * line * (1.0 - smoothstep(12.0, 45.0, distance(vHall, cameraPosition))));
+  diffuseColor.rgb = mix(stone, ornCarpet(vHall.xz, far), uFloorPaint) * ao;
 }
 `;
 
 const CEILING = /* glsl */`
 {
+  float far = smoothstep(14.0, 40.0, distance(vHall, cameraPosition));
+  vec3 cedar = ornCedar(vHall.xz, far);
   if (hallOpen(vHall.xz, 0.001) > 0.5) discard;   // the openings, where the sky shows
   float ao = mix(0.6, 1.0, smoothstep(0.25, 1.4, hallArcadeDx(vHall.x)));
   ao *= mix(0.72, 1.0, smoothstep(0.0, 1.4, uCut - vHall.z));
-  diffuseColor.rgb *= ao;
+  diffuseColor.rgb = mix(diffuseColor.rgb, cedar, uCeilingPaint) * ao;
+}
+`;
+
+// Columns: the shaft in its own marble.
+const SUPPORT_COMMON = /* glsl */`
+uniform vec2 uShaft;
+`;
+const SUPPORT = /* glsl */`
+{
+  float shaft = step(uShaft.x, vObj.y) * step(vObj.y, uShaft.y) * uArches;
+  diffuseColor.rgb = mix(diffuseColor.rgb, ornMarble(vCell, vObj) * vColor.rgb, shaft);
+  hallPolish = shaft * 0.75;
+}
+`;
+
+// Arcade walls: the voussoirs of the lower rib and the upper arch, and the frieze under the
+// ceiling. uAlong is 0 where the arcade runs along z (the field), 1 where it runs along x (the
+// transverse arcade); uRib and uUpper are the two rings, uSpring the heights they spring from.
+const ARCADE_COMMON = /* glsl */`
+uniform float uAlong;
+uniform vec4 uRib, uUpper;
+uniform vec2 uSpring;
+`;
+const ARCADE = /* glsl */`
+{
+  vec2 uv = vec2(mix(vObj.z, vObj.x, uAlong), vObj.y);
+  vec4 rib = ornVoussoirs(uv, uRib, uSpring.x);
+  vec4 upper = ornVoussoirs(uv, uUpper, uSpring.y);
+  vec4 frieze = ornFrieze(uv);
+  diffuseColor.rgb = mix(diffuseColor.rgb, rib.rgb * vColor.rgb, rib.a * uArches);
+  diffuseColor.rgb = mix(diffuseColor.rgb, upper.rgb * vColor.rgb, upper.a * uArches);
+  diffuseColor.rgb = mix(diffuseColor.rgb, frieze.rgb * vColor.rgb, frieze.a * uWallPaint);
+}
+`;
+
+// Large flat walls shade by height per pixel: their few big triangles can't carry vertex
+// shading. The qibla wall carries the zellige dado.
+const WALL = /* glsl */`
+{
+  float shade = 0.74 + 0.26 * smoothstep(0.0, 1.2, vHall.y);
+  diffuseColor.rgb *= shade * (1.0 - 0.3 * smoothstep(uCeiling - 1.1, uCeiling, vHall.y));
+  float dado = step(vHall.y, 1.36) * uWallPaint;
+  diffuseColor.rgb = mix(diffuseColor.rgb, ornZellige(vHall.xy) * shade, dado);
+  hallPolish = dado;
+}
+`;
+
+// The mihrab's frame: its horseshoe ring in voussoirs of gold, lapis and red, and the panel
+// around it in gold mosaic with a lapis lattice and border, as at Córdoba.
+const MIHRAB_COMMON = /* glsl */`
+uniform vec4 uMihrab;   // the arch's centre height, radius, springing height; the panel's half width
+uniform float uMihrabTop;
+`;
+const MIHRAB = /* glsl */`
+{
+  vec2 d = vec2(vHall.x, vHall.y - uMihrab.x);
+  float r = length(d);
+  float ring = step(uMihrab.y - 0.02, r) * step(r, uMihrab.y + 0.32) * step(uMihrab.z - 0.02, vHall.y);
+  float k = mod(floor(atan(d.x, d.y) * uMihrab.y / 0.15 + 0.5), 3.0);
+  vec3 gold = vec3(0.60, 0.40, 0.12);
+  vec3 lapis = vec3(0.04, 0.09, 0.32);
+  vec3 vouss = k < 0.5 ? gold : (k < 1.5 ? lapis : vec3(0.38, 0.07, 0.034));
+  vec2 q = fract(vHall.xy / 0.2) - 0.5;
+  float lattice = 1.0 - smoothstep(0.0, 0.02, abs(abs(q.x) + abs(q.y) - 0.5) - 0.025);
+  float border = 1.0 - step(abs(vHall.x), uMihrab.w - 0.14) * step(vHall.y, uMihrabTop - 0.14);
+  vec3 panel = mix(mix(gold, lapis, lattice), lapis, border);
+  diffuseColor.rgb = mix(diffuseColor.rgb, mix(panel, vouss, ring) * vColor.rgb, uWallPaint);
+  hallPolish = 0.8 * uWallPaint;
 }
 `;
 
@@ -185,62 +286,92 @@ const DOME_COMMON = /* glsl */`
 uniform sampler2D uRose, uRoseOrder;
 uniform float uRoseProgress;
 `;
-
 const DOME = /* glsl */`
-  float hallGlaze = 0.0;
-  {
-    vec3 d = normalize(vHall - uDome);
-    float theta = acos(clamp(d.y, -1.0, 1.0));
-    vec2 uv = 0.5 + 0.5 * min(theta / (0.5 * PI), 1.0) * d.xz / max(length(d.xz), 1e-5);
-    float order = texture2D(uRoseOrder, uv).r * 255.0 / 254.0;
-    hallGlaze = 1.0 - smoothstep(uRoseProgress - 0.004, uRoseProgress, order);
-    diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uRose, uv).rgb * vColor.rgb, hallGlaze);
-  }
+{
+  vec3 d = normalize(vHall - uDome);
+  float theta = acos(clamp(d.y, -1.0, 1.0));
+  vec2 uv = 0.5 + 0.5 * min(theta / (0.5 * PI), 1.0) * d.xz / max(length(d.xz), 1e-5);
+  float order = texture2D(uRoseOrder, uv).r * 255.0 / 254.0;
+  hallPolish = 1.0 - smoothstep(uRoseProgress - 0.004, uRoseProgress, order);
+  diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uRose, uv).rgb * vColor.rgb, hallPolish);
+}
 `;
 
-// Large flat walls shade by height per pixel: their few big triangles can't carry vertex shading.
-const WALL = /* glsl */`
-  diffuseColor.rgb *= (0.74 + 0.26 * smoothstep(0.0, 1.2, vHall.y)) * (1.0 - 0.3 * smoothstep(uCeiling - 1.1, uCeiling, vHall.y));
-`;
+const KINDS = {
+  plaster: ['', ''],
+  floor: ['', FLOOR],
+  ceiling: ['', CEILING],
+  wall: ['', WALL],
+  support: [SUPPORT_COMMON, SUPPORT],
+  arcade: [ARCADE_COMMON, ARCADE],
+  mihrab: [MIHRAB_COMMON, MIHRAB],
+  dome: [DOME_COMMON, DOME],
+};
 
 const LIGHT = /* glsl */`
 {
   vec3 hallN = inverseTransformDirection(normal, viewMatrix);
   vec3 hallLight = hallLanterns(vHall, hallN);
   float hallFacing = max(dot(hallN, uSunDir), 0.0);
-  if (hallFacing > 0.0 && dot(uSunColor, vec3(1.0)) > 1e-4) hallLight += uSunColor * (hallFacing * hallSun(vHall));
+  if (hallFacing > 0.0 && dot(uSunColor, vec3(1.0)) > 1e-4) {
+    vec2 hallPane;
+    float hallVis = hallSun(vHall, hallPane);
+    vec3 hallTint = uGlass > 0.5 && hallPane.x < 1e5 ? hallGlass(hallPane) : vec3(1.0);
+    hallLight += uSunColor * hallTint * (hallFacing * hallVis);
+  }
   reflectedLight.directDiffuse += hallLight * BRDF_Lambert(material.diffuseColor);
 }
 `;
 
 /**
- * Give a MeshStandardMaterial the hall's light. `kind` is 'plaster', 'floor' (adds joints and
- * shading round the column feet), 'ceiling' (adds the openings and shading along the walls) or
- * 'wall' (shading by height, for big flat walls) or 'dome' (the rose; give `extra` its uniforms
- * uRose, uRoseOrder and uRoseProgress).
+ * Give a MeshStandardMaterial the hall's light and colour. `kind` is one of KINDS: 'plaster',
+ * 'floor', 'ceiling', 'wall' (big flat walls; the qibla wall's dado), 'support' (marble shafts;
+ * extra: uShaft), 'arcade' (voussoirs and frieze; extra: uAlong, uRib, uUpper, uSpring), 'mihrab'
+ * (extra: uMihrab, uMihrabTop) or 'dome' (the rose; extra: uRose, uRoseOrder, uRoseProgress).
  */
 export function litMaterial(material, kind = 'plaster', extra = {}) {
+  const [common, surface] = KINDS[kind];
   material.onBeforeCompile = shader => {
-    Object.assign(shader.uniforms, hallUniforms, extra);
+    Object.assign(shader.uniforms, hallUniforms, ornamentUniforms, extra);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vHall;')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vHall;\nvarying vec3 vObj;\nvarying vec2 vCell;')
       .replace('#include <project_vertex>', `#include <project_vertex>
         vec4 hallPos = vec4(transformed, 1.0);
+        vec4 hallCell = vec4(0.0, 0.0, 0.0, 1.0);
         #ifdef USE_INSTANCING
           hallPos = instanceMatrix * hallPos;
+          hallCell = instanceMatrix * hallCell;
         #endif
-        vHall = (modelMatrix * hallPos).xyz;`);
-    const surface = { floor: FLOOR, ceiling: CEILING, wall: WALL, dome: DOME }[kind] ?? '';
+        vHall = (modelMatrix * hallPos).xyz;
+        vObj = transformed;
+        vCell = (modelMatrix * hallCell).xz;`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${COMMON}${kind === 'dome' ? DOME_COMMON : ''}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>\n${surface}`)
+      .replace('#include <common>', `#include <common>\n${COMMON}${common}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>\nfloat hallPolish = 0.0;\n${surface}`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.38, hallPolish);')
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${LIGHT}`);
-    if (kind === 'dome') {
-      shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>',
-        '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.4, hallGlaze);');
-    }
   };
   // Every hall material patches the same base shader, so each kind needs its own program key.
   material.customProgramCacheKey = () => `hall-${kind}`;
   return material;
+}
+
+/** A column: its shaft in marble when the arches layer is on. */
+export function supportMaterial(look, S) {
+  return litMaterial(new THREE.MeshStandardMaterial({ color: look.plaster, roughness: 0.94, vertexColors: true }), 'support', {
+    uShaft: { value: new THREE.Vector2(S.baseTop, S.shaftTop) },
+  });
+}
+
+/**
+ * An arcade wall, with rings of voussoirs from arcadeRings() or transverseRings() in pieces.js.
+ * `along` is 0 for the field's arcades (they run along z) and 1 for the transverse arcade.
+ */
+export function arcadeMaterial(look, rings, along) {
+  return litMaterial(new THREE.MeshStandardMaterial({ color: look.plaster, roughness: 0.94, vertexColors: true }), 'arcade', {
+    uAlong: { value: along },
+    uRib: { value: new THREE.Vector4(...rings.rib) },
+    uUpper: { value: new THREE.Vector4(...rings.upper) },
+    uSpring: { value: new THREE.Vector2(...rings.spring) },
+  });
 }

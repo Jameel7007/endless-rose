@@ -6,14 +6,16 @@
 // They go to capture/views/. Not run by default:
 // readme: clean JPEGs with no words on screen, for the README (docs/readme/) and the link
 // preview (public/og.jpg).
-import { mkdirSync } from 'fs';
+// colour: the colour layers compared, each alone, none and all, in the same two views, with a
+// labelled sheet of each view (capture/views/colour-*.png). T=14:30 sets the hour.
+import { mkdirSync, readFileSync } from 'fs';
 import { collectConsole, launch } from './lib/browser.mjs';
 
 const url = 'http://localhost:5197/';
 const out = new URL('../capture/views/', import.meta.url).pathname;
 mkdirSync(out, { recursive: true });
 const want = process.argv.slice(2);
-const run = name => (want.length === 0 && name !== 'readme') || want.includes(name);
+const run = name => (want.length === 0 && !['readme', 'colour'].includes(name)) || want.includes(name);
 const settle = page => page.waitForFunction(() => {
   const s = window.__hall.state;
   return Math.abs(s.d - s.target) < 0.005 && s.fade === 0;
@@ -122,6 +124,41 @@ if (run('readme')) {
   await shoot(1600, 1000, '20:15', 0, `${docs}isha.jpg`);
   await shoot(1600, 1000, '12:31', 28, `${docs}noon.jpg`);
   await shoot(1200, 630, '16:15', 33, new URL('../public/og.jpg', import.meta.url).pathname, 86);
+}
+
+if (run('colour')) {
+  const variants = [['none', 'As it is'], ['arches', 'Arches: voussoirs, marble'], ['floor', 'Floor: prayer carpets'],
+    ['walls', 'Walls: frieze, dado, mihrab'], ['light', 'Light: stained glass'], ['ceiling', 'Ceiling: painted cedar'], ['all', 'All together']];
+  const t = process.env.T ?? '14:30';
+  const views = { field: { counts: 5, look: [1010, 330] }, approach: { counts: 27, look: [640, 380] } };
+  for (const [view, { counts, look }] of Object.entries(views)) {
+    const files = [];
+    for (const [colour, label] of variants) {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      logs.push(collectConsole(page));
+      await page.goto(`${url}?t=${t}&colour=${colour}`);
+      await page.waitForSelector('html[data-ready="1"]');
+      await page.mouse.move(640, 400);
+      await count(page, counts);
+      await settle(page);
+      await page.mouse.move(...look);
+      await page.waitForTimeout(2600);
+      await page.addStyleTag({ content: '.top, .dhikr { display: none !important; }' });
+      const file = `${out}colour-${view}-${colour}.png`;
+      await page.screenshot({ path: file });
+      files.push([file, label]);
+      await page.close();
+    }
+    // One sheet per view, the variants side by side, three to a row.
+    const sheet = await browser.newPage({ viewport: { width: 1920, height: 400 } });
+    const cells = files.map(([f, label]) => `<figure><img src="data:image/png;base64,${readFileSync(f).toString('base64')}"><figcaption>${label}</figcaption></figure>`).join('');
+    await sheet.setContent(`<style>body{margin:0;background:#1b1714;font:15px/1.3 system-ui;color:#efe6d6}
+      main{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:14px}figure{margin:0}
+      img{width:100%;display:block;border-radius:6px}figcaption{padding:6px 2px 0}</style><main>${cells}</main>`);
+    await sheet.screenshot({ path: `${out}colour-${view}.png`, fullPage: true });
+    await sheet.close();
+    console.log(`colour-${view}.png`);
+  }
 }
 
 await browser.close();

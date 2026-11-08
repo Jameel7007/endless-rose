@@ -3,27 +3,29 @@
 // transverse arcade's line, and main.js moves it each frame.
 import * as THREE from 'three';
 import {
-  domeGeometry, lanternGeometry, mihrabFrameGeometry, nicheGeometry, qiblaWallGeometry,
-  transverseBayGeometry, transverseCeilingGeometry,
+  domeGeometry, lanternGeometry, mihrabFrameGeometry, mihrabShape, nicheGeometry, qiblaWallGeometry,
+  transverseBayGeometry, transverseCeilingGeometry, transverseRings,
 } from './pieces.js';
 import { Glow } from './glow.js';
-import { litMaterial } from './light.js';
+import { arcadeMaterial, litMaterial } from './light.js';
 import { aisles } from '../layout.js';
 import { LANTERNS } from '../config.js';
 
 export class Qibla {
-  constructor({ hall, support, arch, qibla, look, lines, halfWidth, supportGeometry, plaster, rose }) {
+  constructor({ hall, support, arch, qibla, look, lines, halfWidth, supportGeometry, supportMaterial, rose }) {
     this.group = new THREE.Group();
     const m = new THREE.Matrix4();
 
-    const supports = new THREE.InstancedMesh(supportGeometry, plaster, lines.length);
+    const supports = new THREE.InstancedMesh(supportGeometry, supportMaterial, lines.length);
     lines.forEach((x, i) => supports.setMatrixAt(i, m.makeTranslation(x, 0, 0)));
 
     const side = lines.slice(0, -1).filter((x, i) => Math.abs(lines[i + 1] - x - hall.aisle) < 1e-6);
-    const sideArches = new THREE.InstancedMesh(transverseBayGeometry(hall.aisle, hall, support, arch), plaster, side.length);
+    const sideArches = new THREE.InstancedMesh(transverseBayGeometry(hall.aisle, hall, support, arch),
+      arcadeMaterial(look, transverseRings(hall.aisle, support, arch), 1), side.length);
     side.forEach((x, i) => sideArches.setMatrixAt(i, m.makeTranslation(x, 0, 0)));
 
-    const naveArch = new THREE.Mesh(transverseBayGeometry(hall.nave, hall, support, arch), plaster);
+    const naveArch = new THREE.Mesh(transverseBayGeometry(hall.nave, hall, support, arch),
+      arcadeMaterial(look, transverseRings(hall.nave, support, arch), 1));
     naveArch.position.x = -hall.nave / 2;
 
     // A lantern in each side bay of the transverse aisle, as in the field.
@@ -44,7 +46,7 @@ export class Qibla {
 
     const ceiling = new THREE.Mesh(
       transverseCeilingGeometry(halfWidth, hall.transverse, qibla),
-      litMaterial(new THREE.MeshStandardMaterial({ color: look.ceiling, roughness: 0.95 })),
+      litMaterial(new THREE.MeshStandardMaterial({ color: look.ceiling, roughness: 0.95 }), 'ceiling'),
     );
     ceiling.position.y = hall.ceiling;
 
@@ -61,7 +63,12 @@ export class Qibla {
     const wallMaterial = litMaterial(new THREE.MeshStandardMaterial({ color: look.plaster, roughness: 0.94 }), 'wall');
     const wall = new THREE.Mesh(qiblaWallGeometry(halfWidth, hall, qibla), wallMaterial);
     wall.position.z = hall.transverse;
-    const frame = new THREE.Mesh(mihrabFrameGeometry(qibla), wallMaterial);
+    const shape = mihrabShape(qibla);
+    const frame = new THREE.Mesh(mihrabFrameGeometry(qibla), litMaterial(
+      new THREE.MeshStandardMaterial({ color: look.plaster, roughness: 0.94, vertexColors: true }), 'mihrab', {
+        uMihrab: { value: new THREE.Vector4(...shape.arch) },
+        uMihrabTop: { value: shape.top },
+      }));
     frame.position.z = hall.transverse;
 
     const niche = new THREE.Mesh(nicheGeometry(qibla), new THREE.MeshStandardMaterial({

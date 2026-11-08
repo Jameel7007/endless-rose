@@ -3,6 +3,7 @@
 // nearest the camera. A beam is a long quad that turns about its own axis to face the camera.
 import * as THREE from 'three';
 import { aisleIndex, aisles, gapToArcade, isOpen } from '../layout.js';
+import { ornamentUniforms } from './ornament.js';
 
 const WELLS_WITHIN = 60;
 
@@ -32,6 +33,7 @@ export class Openings {
       uCeiling: { value: hall.ceiling },
       uColor: { value: new THREE.Color() },
       uFog: { value: 0.017 },
+      uGlass: ornamentUniforms.uGlass,
     };
     this.beams = new THREE.Mesh(this.geometry, new THREE.ShaderMaterial({
       uniforms: this.uniforms,
@@ -54,12 +56,19 @@ export class Openings {
         }`,
       fragmentShader: /* glsl */`
         uniform vec3 uColor;
+        uniform float uGlass;
         varying vec2 vUv;
         varying float vFade;
+        // Across a beam, the colours of the glass it came through (as hallGlass in light.js).
+        vec3 glassAcross(float x) {
+          float a = abs(x);
+          return a < 0.34 ? vec3(1.0, 0.16, 0.2) : a < 0.6 ? vec3(1.0, 0.6, 0.16) : x > 0.0 ? vec3(0.2, 0.36, 1.0) : vec3(0.22, 0.85, 0.42);
+        }
         void main() {
           float across = 1.0 - smoothstep(0.15, 1.0, abs(vUv.x));
           float along = smoothstep(0.0, 0.05, vUv.y) * (1.0 - smoothstep(0.6, 1.0, vUv.y)) * (1.0 - 0.6 * vUv.y);
-          gl_FragColor = vec4(uColor * (across * along * vFade), 1.0);
+          vec3 tint = mix(vec3(1.0), glassAcross(vUv.x), 0.4 * uGlass) * (1.0 - 0.2 * uGlass);
+          gl_FragColor = vec4(uColor * tint * (across * along * vFade), 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
         }`,

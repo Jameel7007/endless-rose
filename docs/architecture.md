@@ -173,6 +173,34 @@ stays where you left it.
 all 18 pairings come once in 18 rounds. The index starts at the number of days since 1970, so each
 day begins on a different rose.
 
+## Colour
+
+The hall's colour comes in five layers (`src/hall/ornament.js`). Each is a pattern worked out in
+the shaders, with no textures, so it repeats with the hall and costs very little:
+
+- **Arches**:
+  - **Voussoirs**: Córdoba's red brick and cream stone, on both tiers of every arch and round the
+    transverse arches. Each point's angle round its arch's centre picks its voussoir
+    (`ornVoussoirs`). The ring sizes come from the same numbers that build the arches
+    (`arcadeRings` and `transverseRings` in `src/hall/pieces.js`), so the stripes always fit.
+  - **Marble**: each column is its own stone, chosen by hashing its real place in the grid
+    (`ornMarble`), so a column keeps its stone as you walk past it.
+- **Light**: stained glass at the top of every light well. Where the sun's line crosses the glass,
+  `hallGlass` gives that pane's colour, so the sun draws the window onto the floor and the columns:
+  a ruby star, an amber ring, cobalt and emerald corners, and the lead between the panes. The
+  beams take the same colours, softened.
+- **Ceiling**: painted cedar, with eight-point stars in red and green outlined in gold.
+- **Floor** (prayer carpets) and **walls** (frieze, zellige dado, a gold-and-lapis mihrab): made
+  and compared, but not chosen. They are still there with `?colour=all` in the address.
+
+On 2026-11-07 you chose arches, light and ceiling from renders side by side. `node scripts/views.mjs
+colour` makes those renders. The choice is `COLOUR` in `src/config.js`.
+
+How the patterns stay clean:
+- Each pattern repeats with the bay, so the floating origin's jumps never show.
+- Edges are smoothed using `fwidth`, the rate a value changes from one pixel to the next.
+- Fine patterns fade to their average colour in the distance, so they don't shimmer.
+
 ## Keeping it smooth on phones
 
 `src/quality.js` times frames over windows of 1.5 seconds:
@@ -200,6 +228,7 @@ The shader also skips light that couldn't be seen: no lamplight on the plaster b
 | `src/hall/lanterns.js`, `glow.js` | Lanterns, chains and their glow |
 | `src/hall/surfaces.js` | Floor and ceiling |
 | `src/hall/light.js` | The shared shader: sun through the openings, lamplight, contact shadows |
+| `src/hall/ornament.js` | The colour layers: voussoirs, marble, glass, cedar, carpets, wall ornament |
 | `src/hall/beams.js` | Light wells and beams |
 | `src/sky/sun.js` | Sun position, prayer times, qibla bearing (no three.js; tested) |
 | `src/sky/look.js` | The look of each hour (no three.js; tested) |
@@ -236,7 +265,8 @@ governor is the safety net.
 Floating origin, instancing, draw call, frustum culling, critically damped spring, exponential fog,
 ambient occlusion (baked and analytic), tone mapping, seeded procedural generation, analytic
 visibility (instead of shadow maps), penumbra, equation of time, solar declination, hour angle,
-great-circle bearing, azimuthal equidistant projection, binary file format, adaptive resolution.
+great-circle bearing, azimuthal equidistant projection, binary file format, adaptive resolution,
+procedural texturing, screen-space derivatives (fwidth), hashing.
 
 ## Decisions
 

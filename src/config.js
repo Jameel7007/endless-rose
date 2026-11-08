@@ -90,6 +90,10 @@ export const SKY = {
 
 export const LANTERNS = { nave: 4.7, side: 4.4 }; // hanging heights
 
+// The colour layers shown (src/hall/ornament.js has them all): chosen on 2026-11-07 from renders
+// side by side. The carpets and the wall ornament stay available with ?colour= in the address.
+export const COLOUR = ['arches', 'light', 'ceiling'];
+
 export const PHRASES = [
   ['SubhanAllah', 'Glory be to God'],
   ['Alhamdulillah', 'All praise is due to God'],

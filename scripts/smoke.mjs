@@ -125,7 +125,8 @@ const browser = await launch();
   const box = await page.locator('#preview').boundingBox();
   const value = +(await page.inputValue('#preview'));
   const thumbX = box.x + 8 + ((box.width - 16) * value) / 1439;
-  const toX = box.x + box.width * (value < 720 ? 0.85 : 0.15);
+  // From night drag to noon, from day to the small hours, so the sun moves a lot whenever this runs.
+  const toX = box.x + 8 + (box.width - 16) * (value < 360 || value > 1080 ? 0.5 : 0.04);
   await page.mouse.move(thumbX, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(toX, box.y + box.height / 2, { steps: 12 });

@@ -2,7 +2,7 @@
 
 **Live: [jameel7007.github.io/endless-rose](https://jameel7007.github.io/endless-rose/)**
 
-![The nave in the late afternoon: rows of columns and two-tier horseshoe arches running into a warm haze, with beams of sun slanting through the openings in the ceiling](docs/readme/asr.jpg)
+![The nave in the late afternoon: two-tier horseshoe arches in red brick and cream stone on columns of different marbles, under a painted cedar ceiling, running into a warm haze](docs/readme/asr.jpg)
 
 An endless prayer hall for dhikr. Each count carries you one bay down the nave of a T-plan
 hypostyle, a forest of columns in the manner of Córdoba and Kairouan, toward the mihrab. After 33
@@ -33,10 +33,16 @@ times, and lanterns take over at night.
   colourways (Fez, Alhambra, Isfahan, Córdoba, Night, Marrakech). Each day starts on a different one,
   and all 18 pairings come once in 18 rounds. Tiles are laid from the rim up to the crown as you walk,
   and the last is set as you arrive.
+- **Colour, chosen side by side.**
+  - Córdoba's red-brick and cream voussoirs on every arch.
+  - Columns of different marbles.
+  - Stained glass in the openings, so the sun draws coloured stars on the floor.
+  - A painted cedar ceiling.
+  Prayer carpets and wall ornament were made too; add `?colour=all` to the address to see them.
 - **Quiet on any screen.** On slower devices the hall draws fewer pixels until frames run smoothly.
   With reduced motion, counts cut from bay to bay instead of gliding, and the gaze doesn't rise on its own.
 
-![The nave at night: lamplight on the columns, the far hall fading to deep blue, the mihrab glowing at the end](docs/readme/isha.jpg)
+![The nave at night: lamplight on the striped arches and the painted ceiling, the far hall fading to deep blue, the mihrab glowing at the end](docs/readme/isha.jpg)
 
 ## Using it
 

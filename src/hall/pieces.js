@@ -202,3 +202,36 @@ export const lanternGeometry = () => new THREE.OctahedronGeometry(0.17, 0).scale
 
 /** A chain, one metre long and centred, scaled to length per lantern. */
 export const cordGeometry = () => new THREE.BoxGeometry(0.014, 1, 0.014);
+
+/**
+ * The rings of voussoirs on a bay of a field arcade, for the shader: the lower horseshoe rib and
+ * a band round the upper arch. Each ring is [centre u, centre v, inner radius, outer radius],
+ * worked out from the same numbers that build arcadeBayGeometry.
+ */
+export function arcadeRings(hall, S, A) {
+  const mid = hall.bay / 2;
+  const half = mid - S.pier / 2;
+  const ri = half - A.inset;
+  return {
+    rib: [mid, S.impostTop + A.rise, ri, ri + A.ribDepth],
+    upper: [mid, S.pierTop, half, half + 0.45],
+    spring: [S.impostTop, S.pierTop],
+  };
+}
+
+/** The ring of voussoirs round a transverse arch `span` metres wide (it has no rib). */
+export function transverseRings(span, S, A) {
+  const ri = span / 2 - S.pier / 2 - A.inset;
+  return {
+    rib: [0, 0, 0, 0],
+    upper: [span / 2, S.impostTop + A.transverseRise, ri, ri + 0.55],
+    spring: [S.impostTop, S.impostTop],
+  };
+}
+
+/** The mihrab arch [centre height, radius, springing height, frame half width] and the frame's top. */
+export function mihrabShape(Q) {
+  const r = Q.mihrabWidth / 2;
+  const cy = Q.mihrabHeight - r;
+  return { arch: [cy, r, cy - Q.rise, r + 0.65], top: Q.mihrabHeight + 1.25 };
+}

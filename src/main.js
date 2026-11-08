@@ -1,17 +1,18 @@
-// Endless Rose: an endless T-plan prayer hall in plain plaster, lit by the real day.
+// Endless Rose: an endless T-plan prayer hall, lit by the real day.
 // Each count of dhikr moves you one bay down the nave toward the mihrab; the sun comes in
 // through openings in the ceiling where it truly stands, and the hall keeps the prayer times.
 import * as THREE from 'three';
-import { ARCH, HALL, LOOK, MOTION, PHRASES, QIBLA, SKY, SUPPORT, VIEW } from './config.js';
+import { ARCH, COLOUR, HALL, LOOK, MOTION, PHRASES, QIBLA, SKY, SUPPORT, VIEW } from './config.js';
 import { arriveCut, arriveStop, spring, step, withinRound } from './motion.js';
 import { Roses, dayIndex } from './rose/rose.js';
-import { arcadeBayGeometry, supportGeometry } from './hall/pieces.js';
+import { arcadeBayGeometry, arcadeRings, supportGeometry } from './hall/pieces.js';
+import { chooseLayers, ornamentUniforms, showLayers } from './hall/ornament.js';
 import { Field } from './hall/field.js';
 import { Lanterns } from './hall/lanterns.js';
 import { Qibla } from './hall/qibla.js';
 import { Surfaces } from './hall/surfaces.js';
 import { Openings } from './hall/beams.js';
-import { hallUniforms, litMaterial } from './hall/light.js';
+import { arcadeMaterial, hallUniforms, litMaterial, supportMaterial } from './hall/light.js';
 import { Clock, urlPreview } from './sky/clock.js';
 import { lookAt } from './sky/look.js';
 import { currentPlace } from './sky/place.js';
@@ -46,9 +47,12 @@ scene.add(hemi, fill);
 
 // ---- The hall --------------------------------------------------------------------------
 
-const plaster = litMaterial(new THREE.MeshStandardMaterial({ color: LOOK.plaster, roughness: 0.94, vertexColors: true }));
+// The colour layers (src/hall/ornament.js): the chosen ones, unless the address names others.
+showLayers(chooseLayers(location.search, COLOUR));
+
+const columns = supportMaterial(LOOK, SUPPORT);
 const geometries = { support: supportGeometry(SUPPORT), bay: arcadeBayGeometry(HALL, SUPPORT, ARCH) };
-const field = new Field(HALL, geometries, plaster);
+const field = new Field(HALL, geometries, { support: columns, bay: arcadeMaterial(LOOK, arcadeRings(HALL, SUPPORT, ARCH), 0) });
 const halfWidth = Math.max(...field.lines) + HALL.aisle / 2;
 const lanterns = new Lanterns(HALL, field.lines, LOOK);
 const surfaces = new Surfaces(HALL, LOOK, halfWidth + 2);
@@ -62,7 +66,7 @@ const finalStop = arriveStop(MOTION.round, MOTION, HALL, QIBLA);
 
 const qibla = new Qibla({
   hall: HALL, support: SUPPORT, arch: ARCH, qibla: QIBLA, look: LOOK,
-  lines: field.lines, halfWidth, supportGeometry: geometries.support, plaster, rose: roseUniforms,
+  lines: field.lines, halfWidth, supportGeometry: geometries.support, supportMaterial: columns, rose: roseUniforms,
 });
 const openings = new Openings(HALL, SKY, field.lines,
   litMaterial(new THREE.MeshStandardMaterial({ color: LOOK.ceiling, roughness: 0.95, side: THREE.BackSide })));
@@ -96,6 +100,7 @@ function light(sky, look, base, cut) {
   const lamplight = Math.min(1, Math.max(0, (look.lantern - 0.3) / 0.25));
   hallUniforms.uLanternColor.value.set(LOOK.lantern).multiplyScalar(look.lantern * lamplight * SKY.lanternLight);
   hallUniforms.uParity.value = ((base % 2) + 2) % 2;
+  ornamentUniforms.uRowShift.value = ((base % 1024) + 1024) % 1024;
   hallUniforms.uDome.value.set(0, HALL.ceiling, cut + HALL.transverse / 2);
 
   // After sunset the words over the hall turn light on dark.
