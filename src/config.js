@@ -61,8 +61,8 @@ export const VIEW = {
   dead: 0.12,         // desktop: centre of the screen where the pointer doesn't turn the head
   swipe: 0.004,       // touch: radians of turn per pixel of swipe
   gazeSmoothing: 0.45,
-  arriveTilt: 63,     // on arriving under the dome the gaze rises this far: the whole rose in view
-  tiltSmoothing: 1.6,
+  shotSmoothing: 1.4, // on arriving, how quickly the camera turns up to frame the rose (src/shot.js)
+  shotMargin: 0.05,   // the part of the clear band left free round the rose
 };
 
 export const LOOK = {
@@ -83,7 +83,7 @@ export const SKY = {
   well: 0.6,          // depth of the light well above each opening
   solidFrom: 7.6,     // the arcade walls are solid above the crowns of their upper arches
   beamsWithin: 36,    // beams of light are drawn for openings this close
-  lanternLight: 6.5,  // how strongly the lanterns light the plaster near them
+  lanternLight: 9,    // how strongly the lanterns light the plaster near them
   method: 'mwl',      // prayer-time method, from METHODS in src/sky/sun.js
   asr: 'standard',    // or 'hanafi'
 };
@@ -91,8 +91,9 @@ export const SKY = {
 export const LANTERNS = { nave: 4.7, side: 4.4 }; // hanging heights
 
 // The colour layers shown (src/hall/ornament.js has them all): chosen on 2026-11-07 from renders
-// side by side. The carpets and the wall ornament stay available with ?colour= in the address.
-export const COLOUR = ['arches', 'light', 'ceiling'];
+// side by side; later that day the painted ceiling went back to plain plaster, for a lighter hall.
+// The others stay available with ?colour= in the address.
+export const COLOUR = ['arches', 'light'];
 
 export const PHRASES = [
   ['SubhanAllah', 'Glory be to God'],

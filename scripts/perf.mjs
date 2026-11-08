@@ -1,7 +1,7 @@
 // Frame rate with the frame limit off (vsync and Chrome's limit disabled), at a few canvas sizes,
 // looking down the nave and sideways. Each frame reads one pixel back, so the GPU can't run ahead.
 // Usage: node scripts/perf.mjs   (dev server on :5197)
-import { launch } from './lib/browser.mjs';
+import { begin, launch } from './lib/browser.mjs';
 
 const browser = await launch({
   args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'],
@@ -11,6 +11,7 @@ for (const [w, h, dpr, label] of [[1280, 800, 1, 'laptop 1x'], [1280, 800, 2, 'l
   const page = await ctx.newPage();
   await page.goto(`http://localhost:5197/?t=${process.env.T ?? '12:30'}`);
   await page.waitForSelector('html[data-ready="1"]');
+  await begin(page);
   const fps = () => page.evaluate(() => new Promise(done => {
     const gl = window.__hall.renderer.getContext();
     const px = new Uint8Array(4);

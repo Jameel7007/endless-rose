@@ -17,10 +17,12 @@ import { Clock, urlPreview } from './sky/clock.js';
 import { lookAt } from './sky/look.js';
 import { currentPlace } from './sky/place.js';
 import { Fader } from './fader.js';
+import { Guide } from './guide.js';
 import { Input } from './input.js';
 import { Overlay } from './overlay.js';
 import { LightPanel } from './lightpanel.js';
 import { Quality } from './quality.js';
+import { frameRose, rimPoints } from './shot.js';
 
 const canvas = document.getElementById('hall');
 let renderer;
@@ -108,7 +110,7 @@ function light(sky, look, base, cut) {
   if (dark !== root.hasAttribute('data-dark')) root.toggleAttribute('data-dark', dark);
 
   lanterns.setLight(look.lantern, LOOK.lanternGlow, look.fog);
-  qibla.setLight(look.sky, look.lantern, look.fog);
+  qibla.setLight(look.sky, look.lantern, look.fog, shot);
   openings.update(base, cut, sky.dir, look.beam, look.sun, look.fog);
 }
 
@@ -121,16 +123,20 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const fader = new Fader(document.getElementById('fade'));
 
 function count() {
+  if (guide.isOpen) return; // nothing counts while the guide is open
   const next = step(state, MOTION, HALL, QIBLA);
   state.count = next.count;
   state.target = next.target;
   if (next.restart) {
     // Back to the start of the nave for the next phrase, hidden in a wash of light.
-    fader.start(() => { d = reduced.matches ? state.target : 0; v = 0; tilt = 0; }, MOTION.fadeOut, MOTION.fadeIn);
+    fader.start(() => { d = reduced.matches ? state.target : 0; v = 0; shot = 0; }, MOTION.fadeOut, MOTION.fadeIn);
   } else if (reduced.matches) {
-    // No glide: the hall repeats bay by bay, so a cut of one bay is barely visible.
-    d = state.target;
-    v = 0;
+    // No glide: the hall repeats bay by bay, so a cut of one bay is barely visible. The last count
+    // of a round also turns the camera up to the dome, so that cut is hidden in a wash of light.
+    const toDome = state.mode === 'arrive' && withinRound(state.count, MOTION.round) === MOTION.round;
+    const jump = () => { d = state.target; v = 0; };
+    if (toDome) fader.start(jump, MOTION.fadeOut, MOTION.fadeIn);
+    else jump();
   }
   overlay.show(state);
 }
@@ -140,6 +146,7 @@ function setMode(mode) {
   overlay.show({ ...state, mode });
   fader.start(() => {
     state.mode = mode;
+    shot = 0;
     if (mode === 'arrive') {
       state.target = arriveStop(state.count, MOTION, HALL, QIBLA);
       d = state.target;
@@ -154,13 +161,16 @@ function reset() {
     state.target = 0;
     d = 0;
     v = 0;
+    shot = 0;
     overlay.show(state);
   }, MOTION.fadeOut, MOTION.fadeIn);
 }
 
 const overlay = new Overlay(PHRASES, MOTION.round, { onMode: setMode, onReset: reset });
 const input = new Input(canvas, VIEW, count);
+const guide = new Guide({ touch: overlay.touch });
 overlay.show(state);
+guide.welcome(); // the first visit opens with how the hall works
 
 // ---- Frame -----------------------------------------------------------------------------
 
@@ -170,28 +180,44 @@ const quality = new Quality(Math.min(devicePixelRatio, 2), ratio => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
+const pitch0 = (VIEW.pitch * Math.PI) / 180;
+const DEG = Math.PI / 180;
+let baseFov = VIEW.fovLandscape; // the walking view; the dome shot may widen it
+
+// The dome shot (src/shot.js): the tilt and field of view that frame the whole rose between the
+// header and the words, worked out again whenever the screen or the words change.
+const rim = rimPoints({ radius: QIBLA.dome, rise: HALL.ceiling - VIEW.eye, before: QIBLA.stopBeforeDome });
+let framing = { pitch: 67 * DEG, fov: VIEW.fovLandscape };
+function fitShot() {
+  const h = innerHeight;
+  const top = document.querySelector('.top').getBoundingClientRect();
+  const words = document.querySelector('.dhikr').getBoundingClientRect();
+  const band = [top.height ? top.bottom / h : 0, words.height ? words.top / h : 1]; // hidden words leave the whole screen
+  framing = frameRose(rim, camera.aspect, band, { minFov: baseFov, margin: VIEW.shotMargin });
+}
+
 function resize() {
   renderer.setPixelRatio(quality.ratio);
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
-  camera.fov = camera.aspect < 1 ? VIEW.fovPortrait : VIEW.fovLandscape;
+  baseFov = camera.aspect < 1 ? VIEW.fovPortrait : VIEW.fovLandscape;
   camera.updateProjectionMatrix();
+  fitShot();
 }
 addEventListener('resize', resize);
 resize();
 
-const pitch0 = (VIEW.pitch * Math.PI) / 180;
-const tiltUp = (VIEW.arriveTilt * Math.PI) / 180;
 let last = performance.now();
 let ready = false;
 let sky;
-let tilt = 0;       // the rise of the gaze on arriving under the dome
+let shot = 0;       // 0 walking, 1 framing the dome: on arriving the camera turns to the rose
 let aheadLaid = 0;  // in Ahead mode the rose is laid with the count instead of the walk
 
 /**
  * The rose's laying: in Arrive mode it follows the walk down the nave, so the last tile is set
- * as you stop under the dome; a new rose is drawn while the dome is still bare. On arriving,
- * the gaze rises to it (not with reduced motion).
+ * as you stop under the dome; a new rose is drawn while the dome is still bare. On arriving, the
+ * camera takes the gaze and frames the whole rose, whatever the pointer or a swipe was doing; with
+ * reduced motion it cuts there instead of turning.
  */
 function layRose(dt) {
   const n = withinRound(state.count, MOTION.round);
@@ -206,7 +232,13 @@ function layRose(dt) {
   roseUniforms.uRoseProgress.value = laid * 1.01; // a little past 1, so the last tile is set
   if (index !== roses.wanted && (laid < 0.02 || state.mode === 'ahead')) roses.show(index);
   const arrived = state.mode === 'arrive' && n === MOTION.round && d > finalStop - 2.5;
-  tilt += ((arrived && !reduced.matches ? tiltUp : 0) - tilt) * (1 - Math.exp(-dt / VIEW.tiltSmoothing));
+  if (arrived && !input.locked) {
+    input.centre(); // so the walk resumes looking ahead
+    fitShot();
+  }
+  input.locked = arrived;
+  if (reduced.matches) shot = arrived ? 1 : 0;
+  else shot += ((arrived ? 1 : 0) - shot) * (1 - Math.exp(-dt / VIEW.shotSmoothing));
   overlay.rose(arrived && roses.shown === index ? roses.name : '');
 }
 
@@ -234,7 +266,14 @@ function frame(now) {
   panel.show(sky);
 
   camera.position.set(0, VIEW.eye, local);
-  camera.rotation.set(Math.min(1.45, pitch0 + input.pitch + tilt), Math.PI + input.yaw, 0); // yaw π: face +z, the qibla
+  // Walking, the gaze is yours; at the dome the camera frames the rose, wide enough for its width.
+  const fov = baseFov + (framing.fov - baseFov) * shot;
+  if (Math.abs(fov - camera.fov) > 1e-3) {
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
+  const walk = pitch0 + input.pitch;
+  camera.rotation.set(walk + (framing.pitch - walk) * shot, Math.PI + input.yaw * (1 - shot), 0); // yaw π: face +z, the qibla
   renderer.render(scene, camera);
 
   if (!ready) {
@@ -249,7 +288,10 @@ requestAnimationFrame(frame);
 if (import.meta.env.DEV) {
   window.__hall = {
     get state() {
-      return { ...state, d, base: Math.floor(d / HALL.bay), yaw: input.yaw, pitch: input.pitch, fade: fader.level, tilt };
+      return { ...state, d, base: Math.floor(d / HALL.bay), yaw: input.yaw, pitch: input.pitch, fade: fader.level, shot };
+    },
+    get view() {
+      return { pitch: camera.rotation.x, yaw: camera.rotation.y - Math.PI, fov: camera.fov };
     },
     get rose() {
       return { laid: roseUniforms.uRoseProgress.value, shown: roses.shown, name: roses.name, today };

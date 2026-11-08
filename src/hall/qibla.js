@@ -105,13 +105,16 @@ export class Qibla {
       sideLamps, sideChains, this.mihrabGlow.mesh, this.lampGlow.mesh, this.sideGlow.mesh);
   }
 
-  /** The hour's light: the oculus shows the sky; the mihrab and the lamp glow more by night. */
-  setLight(sky, lantern, fog) {
+  /**
+   * The hour's light: the oculus shows the sky; the mihrab and the lamp glow more by night. While
+   * the camera frames the dome (`shot` 1) the lamp's glow is softened so the rose reads through it.
+   */
+  setLight(sky, lantern, fog, shot = 0) {
     this.oculus.color.setRGB(...sky).multiplyScalar(1.6);
     this.light.intensity = this.look.mihrabLight * (1 + 0.6 * lantern);
     this.mihrabGlow.setStrength(this.look.mihrabGlow * (0.8 + 0.6 * lantern));
     this.mihrabGlow.setFog(fog);
-    this.lampGlow.setStrength(0.35 + 0.75 * lantern);
+    this.lampGlow.setStrength((0.35 + 0.75 * lantern) * (1 - 0.5 * shot));
     this.lampGlow.setFog(fog);
     this.sideGlow.setStrength(this.look.lanternGlow * (0.2 + 0.8 * lantern));
     this.sideGlow.setFog(fog);

@@ -3,7 +3,7 @@
 // Usage: npm run smoke  (dev server on :5197)   or   npm run smoke -- --url http://host:port/
 // Screenshots go to capture/smoke/.
 import { mkdirSync } from 'fs';
-import { collectConsole, launch } from './lib/browser.mjs';
+import { begin, collectConsole, launch } from './lib/browser.mjs';
 
 const arg = name => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : undefined; };
 const url = arg('--url') ?? 'http://localhost:5197/';
@@ -29,6 +29,10 @@ const afterFade = async page => {
   await settle(page);
 };
 const shot = (page, name) => page.screenshot({ path: `${dir}${name}.png` });
+const view = page => page.evaluate(() => window.__hall.view);
+const deg = r => (r * 180) / Math.PI;
+const hint = page => page.textContent('#hint');
+const hintGone = page => page.evaluate(() => document.querySelector('#hint').classList.contains('gone'));
 
 const browser = await launch();
 
@@ -38,6 +42,14 @@ const browser = await launch();
   const log = collectConsole(page);
   await page.goto(url);
   await ready(page);
+  // A first visit opens with the guide, its Begin button ready for Enter or Space.
+  check('the guide opens on the first visit', await page.isVisible('#guide')
+    && await page.evaluate(() => document.activeElement?.id === 'begin'));
+  await shot(page, '00-guide');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(300);
+  check('Space on Begin closes it, without counting', !(await page.isVisible('#guide')) && (await state(page)).count === 0);
+  check('the first hint says how to count', (await hint(page)) === 'Click anywhere or press Space to count');
   await page.mouse.move(640, 400);
   await page.waitForTimeout(800);
   await shot(page, '01-start');
@@ -58,8 +70,20 @@ const browser = await launch();
   let s = await state(page);
   check('five clicks count five', s.count === 5 && (await shown(page)) === '5', `count ${s.count}, shown ${await shown(page)}`);
   check('and move five bays', Math.abs(s.d - 5 * BAY) < 0.01, `d ${s.d.toFixed(3)} m`);
+  check('the hints have gone quiet by then', await hintGone(page));
 
-  for (let i = 5; i < 33; i++) {
+  await page.mouse.move(640, 2);
+  await page.waitForTimeout(2500);
+  s = await state(page);
+  check('the pointer at the top looks up', s.pitch > 0.25, `pitch ${s.pitch.toFixed(2)} rad`);
+  await page.mouse.move(640, 400);
+
+  for (let i = 5; i < 28; i++) {
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(40);
+  }
+  check('near the end the hint counts down to the dome', (await hint(page)) === '5 more to the dome' && !(await hintGone(page)));
+  for (let i = 28; i < 33; i++) {
     await page.keyboard.press('Space');
     await page.waitForTimeout(40);
   }
@@ -72,13 +96,18 @@ const browser = await launch();
   const rose = await page.evaluate(() => window.__hall.rose);
   check('the rose is finished on arrival, and named', rose.laid > 1 && rose.shown === rose.today
     && (await page.getAttribute('#rose', 'class')).includes('shown'), `${rose.name}, laid ${rose.laid.toFixed(2)}`);
-  check('and the gaze rises to it', (await state(page)).tilt > 0.9, `tilt ${(await state(page)).tilt.toFixed(2)} rad`);
+  let v = await view(page);
+  check('the camera turns up and frames the dome', (await state(page)).shot > 0.95 && deg(v.pitch) > 55 && Math.abs(v.yaw) < 0.01
+    && v.fov >= 58, `up ${deg(v.pitch).toFixed(1)}°, fov ${v.fov.toFixed(1)}°`);
+  check('the hint says how to go on', (await hint(page)) === 'Click or press Space to begin the next round');
+  check('and the line under the count is full', await page.evaluate(() => getComputedStyle(document.querySelector('#progress')).transform) === 'matrix(1, 0, 0, 1, 0, 0)');
   await shot(page, '02-arrived');
 
-  await page.mouse.move(640, 2);
+  await page.mouse.move(1279, 2, { steps: 6 });
   await page.waitForTimeout(2500);
-  s = await state(page);
-  check('the pointer at the top looks up', s.pitch > 0.25, `pitch ${s.pitch.toFixed(2)} rad`);
+  const held = await view(page);
+  check('the pointer can\'t turn the shot away', Math.abs(held.yaw) < 0.01 && Math.abs(held.pitch - v.pitch) < 0.01,
+    `yaw ${deg(held.yaw).toFixed(1)}°, up ${deg(held.pitch).toFixed(1)}°`);
   await shot(page, '03-dome');
 
   await page.mouse.move(640, 400);
@@ -89,6 +118,8 @@ const browser = await launch();
   check('with the next phrase', (await page.textContent('#phrase')) === 'Alhamdulillah' && (await shown(page)) === '1');
   const next = await page.evaluate(() => window.__hall.rose);
   check('the next round brings the next rose, still bare', next.shown === next.today + 1 && next.laid < 0.15, `${next.name}, laid ${next.laid.toFixed(2)}`);
+  v = await view(page);
+  check('and the camera looks down the nave again', deg(v.pitch) < 10 && Math.abs(v.fov - 58) < 0.1, `up ${deg(v.pitch).toFixed(1)}°, fov ${v.fov.toFixed(1)}°`);
 
   await page.mouse.move(1279, 430);
   await page.waitForTimeout(2500);
@@ -151,8 +182,17 @@ const browser = await launch();
   await page.mouse.click(640, 400);
   await page.waitForTimeout(100);
   check('the hall still counts after the panel', (await state(page)).count === 2);
+  await page.click('#guide-open');
+  check('the Guide button opens the guide again', await page.isVisible('#guide') && (await page.textContent('#begin')) === 'Continue');
+  await page.mouse.click(30, 770); // on the dimmed hall, outside the card
+  await page.waitForTimeout(200);
+  check('a click outside the card closes it, without counting', !(await page.isVisible('#guide')) && (await state(page)).count === 2);
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(100);
+  check('and Space counts again', (await state(page)).count === 3);
   await page.goto(`${url}?t=21:00`);
   await ready(page);
+  check('the guide stays closed on the next visit', !(await page.isVisible('#guide')));
   check('after sunset the words turn light', await page.evaluate(() => document.documentElement.hasAttribute('data-dark')));
   await page.goto(`${url}?t=12:00`);
   await ready(page);
@@ -170,6 +210,10 @@ const browser = await launch();
   const log = collectConsole(page);
   await page.goto(url);
   await ready(page);
+  await shot(page, '06-phone-guide');
+  check('on the phone the guide speaks of taps and swipes', (await page.textContent('#guide-count')) === 'Tap anywhere for each dhikr.'
+    && (await page.textContent('#guide-look')) === 'Swipe to look around.');
+  await begin(page, { tap: true });
   await page.waitForTimeout(800);
   await shot(page, '06-phone');
   for (let i = 0; i < 3; i++) {
@@ -192,6 +236,24 @@ const browser = await launch();
   s = await state(page);
   check('a swipe turns the head and does not count', s.count === 3 && s.yaw > 0.3, `yaw ${s.yaw.toFixed(2)} rad, count ${s.count}`);
   await shot(page, '07-phone-swipe');
+
+  for (let i = 3; i < 33; i++) {
+    await page.touchscreen.tap(195, 420);
+    await page.waitForTimeout(60);
+  }
+  await touch('touchStart', 300, 420); // a swipe while arriving: the camera keeps the shot
+  for (let x = 300; x >= 100; x -= 20) {
+    await touch('touchMove', x, 420);
+    await page.waitForTimeout(16);
+  }
+  await touch('touchEnd');
+  await settle(page, 15000);
+  await page.waitForTimeout(5000);
+  s = await state(page);
+  const v = await view(page);
+  check('on the phone too the camera frames the dome, wider to fit it', s.count === 33 && s.shot > 0.95 && deg(v.pitch) > 55
+    && Math.abs(v.yaw) < 0.01 && v.fov > 72, `up ${deg(v.pitch).toFixed(1)}°, fov ${v.fov.toFixed(1)}°, yaw ${deg(v.yaw).toFixed(1)}°`);
+  await shot(page, '07b-phone-dome');
   check('no console errors on the phone', log.length === 0, log.join(' | '));
   await ctx.close();
 }
@@ -203,15 +265,21 @@ const browser = await launch();
   const log = collectConsole(page);
   await page.goto(url);
   await ready(page);
+  await begin(page);
   await page.mouse.move(640, 400);
   await page.keyboard.press('Space');
   await page.waitForTimeout(50);
   let s = await state(page);
   check('with reduced motion a count cuts straight to the next bay', Math.abs(s.d - BAY) < 1e-6, `d ${s.d.toFixed(3)} m`);
-  for (let i = 1; i < 33; i++) await page.keyboard.press('Space');
-  await page.waitForTimeout(3000);
+  for (let i = 1; i < 32; i++) await page.keyboard.press('Space');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(100);
   s = await state(page);
-  check('and the gaze doesn\'t rise on arriving', s.count === 33 && s.tilt < 0.01, `tilt ${s.tilt.toFixed(3)}`);
+  check('the last count hides its cut to the dome in a wash of light', s.count === 33 && s.fade > 0 && s.shot === 0, `fade ${s.fade.toFixed(2)}`);
+  await page.waitForTimeout(2500);
+  s = await state(page);
+  const v = await view(page);
+  check('and then the dome is framed, with no turning', s.shot === 1 && s.fade === 0 && deg(v.pitch) > 55, `up ${deg(v.pitch).toFixed(1)}°`);
   check('no console errors with reduced motion', log.length === 0, log.join(' | '));
   await ctx.close();
 }

@@ -64,6 +64,25 @@ openings in the ceiling where it truly stands, and the hall keeps the prayer tim
 - **Touch**: a swipe turns the head and a tap counts. A press that moves more than 10 px is a swipe.
 - **Keys**: Space or Enter counts, the arrow keys look around, Home looks straight ahead again.
 
+## Finding your way
+
+- **The guide** (`src/guide.js`): a card with four lines (count, walk, arrive, look), in the words of
+  the device: "tap" and "swipe" on a touch screen, "click", "Space" and "the pointer" elsewhere. It
+  opens by itself on a first visit, remembered in this browser only, and again from the Guide
+  button (a **?** on phones). It is a modal `<dialog>`, so nothing behind it can be pressed, and
+  nothing counts while it is open. Begin is focused, so Enter or Space closes it.
+- **Focus**: after a mouse click on a button, the page lets go of focus, so the next Space counts
+  instead of pressing that button again. Keyboard users keep their focus. The smoke check found
+  that a click on Begin had left focus on the hidden button, so Space did nothing; closing the
+  guide now lets go of it.
+- **Hints** under the count (`hintFor()` in `src/overlay.js`): how to count at 0; that each count is
+  a bay nearer the mihrab, for the first three; a countdown for the last five ("3 more to the
+  dome"); and at 33, how to begin the next round. In between there is nothing, so the hall stays
+  quiet.
+- **The line under the count** fills as the round goes, in gold.
+- **Veils**: soft gradients at the top and bottom of the screen keep the words legible over the
+  brightest arches.
+
 ## Light that keeps prayer time
 
 **The clock** (`src/sky/clock.js`) shows either now or a moment you are previewing. The Light panel's
@@ -118,7 +137,8 @@ a wall.
 dawn blues, the rose and gold of sunrise and sunset, the cream of day. Evenings are warmer than
 mornings at the same height. Each key sets the haze, the sky light, the bounce from the floor,
 the sunlight's colour and strength, the beams, the lanterns and the exposure, and the hall blends
-between them.
+between them. On 2026-11-07 the whole day was made brighter: more sky light and sunlight, a little
+more exposure, and stronger lamplight at night (`SKY.lanternLight`).
 
 **Lanterns light the plaster** the same way, from the grid: each pixel adds the nearest lanterns of
 the nave, the nearby side aisles and the transverse aisle, plus the big lamp under the dome. Each
@@ -165,9 +185,23 @@ the nave's arch you can watch the rim rings appear, and the last tile at the cro
 stop. The shader shows a tile once the laying passes its place in the order, and gives laid tiles a
 glaze (less rough than plaster).
 
-**Arriving.** Your gaze rises to about 67°, which brings the whole dome into view, from its far rim
-to its near rim. The rose's name appears under the count. With reduced motion turned on, the gaze
-stays where you left it.
+**Arriving: the dome shot** (`src/shot.js`). At 33, as you come to a stop, the camera takes over.
+Pointer and swipes no longer turn it, and it turns up to frame the whole rose. The rose's name appears
+under the count. The next count gives the view back, hidden in the wash of light that starts the
+next round.
+
+The framing is worked out for each screen:
+- The rim of the dome is a circle. The camera's tilt and field of view are found by projecting points
+  round that circle, as the renderer will, until the rose sits centred in the clear band between the
+  header and the words, and fits inside it and inside the screen's width.
+- On a laptop that is a tilt of about 66° with the view widened to about 76°. On a phone held
+  upright, about 69° and 98°, because the rose's width is what has to fit.
+- It is worked out again on arriving and whenever the screen changes size.
+- The large lamp under the dome lights the rose at night, and its glow is softened while the camera
+  holds the shot, so the tiles read through it.
+
+With reduced motion turned on, the camera doesn't turn: the last count cuts to the shot under the
+wash of light.
 
 **Which rose.** `roseFor(index)` changes the design every round and turns the six colourways, so
 all 18 pairings come once in 18 rounds. The index starts at the number of days since 1970, so each
@@ -191,10 +225,12 @@ the shaders, with no textures, so it repeats with the hall and costs very little
   beams take the same colours, softened.
 - **Ceiling**: painted cedar, with eight-point stars in red and green outlined in gold.
 - **Floor** (prayer carpets) and **walls** (frieze, zellige dado, a gold-and-lapis mihrab): made
-  and compared, but not chosen. They are still there with `?colour=all` in the address.
+  and compared, but not chosen.
 
-On 2026-11-07 you chose arches, light and ceiling from renders side by side. `node scripts/views.mjs
-colour` makes those renders. The choice is `COLOUR` in `src/config.js`.
+On 2026-11-07 you chose arches, light and ceiling from renders side by side. Later that day the
+ceiling went back to plain plaster, for a lighter, quieter hall. The ceiling, floor and walls are
+still there with `?colour=all` in the address. `node scripts/views.mjs colour` makes the renders.
+The choice is `COLOUR` in `src/config.js`.
 
 How the patterns stay clean:
 - Each pattern repeats with the bay, so the floating origin's jumps never show.
@@ -238,23 +274,28 @@ The shader also skips light that couldn't be seen: no lamplight on the plaster b
 | `src/quality.js` | Fewer pixels when frames run slow (no three.js; tested) |
 | `scripts/import-roses.mjs` | Makes `src/rose/data/*.bin` from the Rosette project |
 | `scripts/smoke.mjs`, `views.mjs`, `perf.mjs` | Real-input checks, screenshots, frame rate |
-| `src/input.js`, `overlay.js`, `fader.js` | Input, the words on screen, the wash of light |
+| `src/input.js`, `overlay.js`, `fader.js` | Input, the words and hints on screen, the wash of light |
+| `src/shot.js` | The dome shot: the tilt and field of view that frame the rose (no three.js; tested) |
+| `src/guide.js` | The guide card |
 | `src/lightpanel.js` | The Light panel and the prayer-time line under the name |
 | `src/main.js` | Puts it together and runs the frame loop |
 
 ## Checking it
 
-- `npm test` runs 23 tests:
+- `npm test` runs 29 tests:
   - the layout of the hall, and the counting and glide
   - the sun against adhan-js, the look of the hours, and the ceiling openings
   - the rose files and their laying order, and that every rose comes round
   - the resolution governor
+  - the dome shot: that the whole rose fits between the header and the words on a laptop, a phone
+    held either way, and a tablet
 - `npm run smoke` needs the dev server on port 5197. It does a cold load in headless Chrome, driven
-  only by real clicks, keys, taps and swipes, and runs 28 checks, including the Light panel. Its
-  screenshots go in `capture/smoke/`. It reads `window.__hall` (dev builds only) to measure what
-  the input did; it never drives it.
+  only by real clicks, keys, taps and swipes, and runs 49 checks, including the guide, the hints,
+  the dome shot on a laptop and a phone, and the Light panel. Its screenshots go in
+  `capture/smoke/`. It reads `window.__hall` (dev builds only) to measure what the input did; it
+  never drives it.
 
-Measured on an M2 Pro (headless Chrome, frame limit off, at noon and at night): between about 150
+Measured on an M2 Pro (headless Chrome, frame limit off, at noon and at night): between about 110
 and 240 fps at 1280×800, 2560×1600 and phone size. That is about 660k triangles in 35 draw calls,
 and the numbers vary by a few dozen fps from run to run. `node scripts/perf.mjs` measures it;
 `T=21:00` before it measures at night. It hasn't been measured on a real phone: the resolution
@@ -272,6 +313,8 @@ procedural texturing, screen-space derivatives (fwidth), hashing.
 
 - **Arrive or Ahead** (decided on 2026-10-29): Arrive is the default, so each round ends at the
   mihrab under its rose. Ahead stays in the toggle.
+- **The end of a round** (decided on 2026-11-07): the camera takes the view and frames the dome on
+  every device, whatever the pointer or a swipe is doing, until the next count.
 - **Still to judge in use:**
   - the pace: one bay per count, a glide of about two seconds (`MOTION.stiffness`, `HALL.bay`)
   - the light and the roses on a real phone

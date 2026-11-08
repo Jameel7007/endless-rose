@@ -4,15 +4,15 @@
 // so most colours come in pairs, [morning, evening]. Colours are sRGB; they mix in linear light.
 
 const KEYS = [
-  { alt: -90, haze: [0x10141f, 0x10141f], sky: [0x2b3a5c, 0x2b3a5c], ground: [0x1b1715, 0x1b1715], sun: [0x000000, 0x000000], hemi: 0.55, sunI: 0, beam: 0, lantern: 1, exposure: 1.2, fog: 0.026 },
-  { alt: -18, haze: [0x10141f, 0x10141f], sky: [0x2b3a5c, 0x2b3a5c], ground: [0x1b1715, 0x1b1715], sun: [0x000000, 0x000000], hemi: 0.55, sunI: 0, beam: 0, lantern: 1, exposure: 1.2, fog: 0.026 },
-  { alt: -12, haze: [0x18213a, 0x1d1f38], sky: [0x33446b, 0x3a3d66], ground: [0x1e1a1a, 0x201a1a], sun: [0x000000, 0x000000], hemi: 0.75, sunI: 0, beam: 0, lantern: 1, exposure: 1.18, fog: 0.024 },
-  { alt: -6, haze: [0x4c5a80, 0x5a4f78], sky: [0x6c7fae, 0x7b6fa6], ground: [0x3a3232, 0x3d3030], sun: [0x000000, 0x000000], hemi: 1.2, sunI: 0, beam: 0, lantern: 0.85, exposure: 1.12, fog: 0.022 },
-  { alt: -1, haze: [0xb9a9b8, 0xc08f86], sky: [0xcdb9c4, 0xd39a86], ground: [0x7a6a66, 0x7c5e52], sun: [0xffb07a, 0xff9a5c], hemi: 1.8, sunI: 0, beam: 0, lantern: 0.55, exposure: 1.1, fog: 0.019 },
-  { alt: 3, haze: [0xead0b5, 0xe9b48a], sky: [0xf6e0c6, 0xf3c79a], ground: [0xa8917a, 0xa88a6c], sun: [0xffc08a, 0xffa860], hemi: 2.1, sunI: 2.4, beam: 0.1, lantern: 0.35, exposure: 1.0, fog: 0.018 },
-  { alt: 12, haze: [0xefdcc4, 0xf0d3a8], sky: [0xfbead2, 0xfadcb0], ground: [0xbba68d, 0xbda07f], sun: [0xffd7a8, 0xffc888], hemi: 2.4, sunI: 3.2, beam: 0.16, lantern: 0.2, exposure: 1.0, fog: 0.017 },
-  { alt: 25, haze: [0xeee3d1, 0xefdfc6], sky: [0xfff3e2, 0xfdebd2], ground: [0xc9bca8, 0xc8b79c], sun: [0xffe6c4, 0xffdcb4], hemi: 2.5, sunI: 3.8, beam: 0.14, lantern: 0.15, exposure: 1.0, fog: 0.017 },
-  { alt: 90, haze: [0xf0eadf, 0xf0eadf], sky: [0xfff8ee, 0xfff8ee], ground: [0xcfc4b4, 0xcfc4b4], sun: [0xfff1dc, 0xfff1dc], hemi: 2.6, sunI: 4.0, beam: 0.12, lantern: 0.12, exposure: 1.0, fog: 0.017 },
+  { alt: -90, haze: [0x10141f, 0x10141f], sky: [0x2b3a5c, 0x2b3a5c], ground: [0x1b1715, 0x1b1715], sun: [0x000000, 0x000000], hemi: 0.8, sunI: 0, beam: 0, lantern: 1, exposure: 1.45, fog: 0.026 },
+  { alt: -18, haze: [0x10141f, 0x10141f], sky: [0x2b3a5c, 0x2b3a5c], ground: [0x1b1715, 0x1b1715], sun: [0x000000, 0x000000], hemi: 0.8, sunI: 0, beam: 0, lantern: 1, exposure: 1.45, fog: 0.026 },
+  { alt: -12, haze: [0x18213a, 0x1d1f38], sky: [0x33446b, 0x3a3d66], ground: [0x1e1a1a, 0x201a1a], sun: [0x000000, 0x000000], hemi: 1.0, sunI: 0, beam: 0, lantern: 1, exposure: 1.4, fog: 0.024 },
+  { alt: -6, haze: [0x4c5a80, 0x5a4f78], sky: [0x6c7fae, 0x7b6fa6], ground: [0x3a3232, 0x3d3030], sun: [0x000000, 0x000000], hemi: 1.5, sunI: 0, beam: 0, lantern: 0.85, exposure: 1.3, fog: 0.022 },
+  { alt: -1, haze: [0xb9a9b8, 0xc08f86], sky: [0xcdb9c4, 0xd39a86], ground: [0x7a6a66, 0x7c5e52], sun: [0xffb07a, 0xff9a5c], hemi: 2.2, sunI: 0, beam: 0, lantern: 0.55, exposure: 1.2, fog: 0.019 },
+  { alt: 3, haze: [0xead0b5, 0xe9b48a], sky: [0xf6e0c6, 0xf3c79a], ground: [0xa8917a, 0xa88a6c], sun: [0xffc08a, 0xffa860], hemi: 2.5, sunI: 2.8, beam: 0.1, lantern: 0.35, exposure: 1.08, fog: 0.018 },
+  { alt: 12, haze: [0xefdcc4, 0xf0d3a8], sky: [0xfbead2, 0xfadcb0], ground: [0xbba68d, 0xbda07f], sun: [0xffd7a8, 0xffc888], hemi: 2.85, sunI: 3.7, beam: 0.16, lantern: 0.2, exposure: 1.1, fog: 0.017 },
+  { alt: 25, haze: [0xeee3d1, 0xefdfc6], sky: [0xfff3e2, 0xfdebd2], ground: [0xc9bca8, 0xc8b79c], sun: [0xffe6c4, 0xffdcb4], hemi: 3.0, sunI: 4.4, beam: 0.14, lantern: 0.15, exposure: 1.1, fog: 0.017 },
+  { alt: 90, haze: [0xf0eadf, 0xf0eadf], sky: [0xfff8ee, 0xfff8ee], ground: [0xcfc4b4, 0xcfc4b4], sun: [0xfff1dc, 0xfff1dc], hemi: 3.1, sunI: 4.6, beam: 0.12, lantern: 0.12, exposure: 1.1, fog: 0.017 },
 ];
 
 const toLinear = c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);

@@ -294,6 +294,7 @@ const DOME = /* glsl */`
   float order = texture2D(uRoseOrder, uv).r * 255.0 / 254.0;
   hallPolish = 1.0 - smoothstep(uRoseProgress - 0.004, uRoseProgress, order);
   diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uRose, uv).rgb * vColor.rgb, hallPolish);
+  hallDomeLamp = 1.0;
 }
 `;
 
@@ -312,6 +313,8 @@ const LIGHT = /* glsl */`
 {
   vec3 hallN = inverseTransformDirection(normal, viewMatrix);
   vec3 hallLight = hallLanterns(vHall, hallN);
+  // By night the large lamp lights the rose from below, more than its share of the hall's sum.
+  if (hallDomeLamp > 0.0) hallLight += 4.4 * uLanternColor * hallLamp(vHall, hallN, vec3(uDome.x, 5.4, uDome.z));
   float hallFacing = max(dot(hallN, uSunDir), 0.0);
   if (hallFacing > 0.0 && dot(uSunColor, vec3(1.0)) > 1e-4) {
     vec2 hallPane;
@@ -347,7 +350,7 @@ export function litMaterial(material, kind = 'plaster', extra = {}) {
         vCell = (modelMatrix * hallCell).xz;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${COMMON}${common}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>\nfloat hallPolish = 0.0;\n${surface}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>\nfloat hallPolish = 0.0;\nfloat hallDomeLamp = 0.0;\n${surface}`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.38, hallPolish);')
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${LIGHT}`);
   };

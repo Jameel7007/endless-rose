@@ -16,6 +16,7 @@ export class Input {
     this.tYaw = 0;
     this.tPitch = 0;
     this.press = null;
+    this.locked = false; // while the camera frames the dome, the gaze is not yours to turn
     this.hover = matchMedia('(hover: hover) and (pointer: fine)').matches;
     this.limits = { yaw: rad(view.yaw), up: rad(view.pitchUp), down: rad(view.pitchDown) };
 
@@ -58,6 +59,7 @@ export class Input {
 
   /** Desktop: the pointer's place on screen sets where the head turns, with a still centre. */
   aim(x, y) {
+    if (this.locked) return;
     const f = n => Math.sign(n) * smooth(this.view.dead, 1, Math.abs(n));
     const nx = (x / innerWidth) * 2 - 1;
     const ny = (y / innerHeight) * 2 - 1;
@@ -66,6 +68,7 @@ export class Input {
   }
 
   turn(dYaw, dPitch) {
+    if (this.locked) return;
     this.tYaw = clamp(this.tYaw + dYaw, -this.limits.yaw, this.limits.yaw);
     this.tPitch = clamp(this.tPitch + dPitch, -this.limits.down, this.limits.up);
   }
@@ -84,6 +87,11 @@ export class Input {
     } else if (e.key === 'Home') {
       this.tYaw = this.tPitch = 0;
     }
+  }
+
+  /** Look straight ahead again (the gaze glides there). */
+  centre() {
+    this.tYaw = this.tPitch = 0;
   }
 
   update(dt) {

@@ -6,6 +6,9 @@
   --glass: rgba(247, 241, 230, 0.74);
   --panel: rgba(247, 241, 230, 0.9);
   --halo: rgba(247, 241, 230, 0.95);
+  --veil: rgba(247, 241, 230, 0.55);
+  --card: rgba(249, 244, 235, 0.97);
+  --gold: #a87a26;
   --ease: cubic-bezier(.22, 1, .36, 1);
   color-scheme: light;
 }
@@ -19,6 +22,9 @@
   --glass: rgba(30, 26, 26, 0.55);
   --panel: rgba(30, 26, 26, 0.86);
   --halo: rgba(10, 8, 12, 0.85);
+  --veil: rgba(14, 11, 12, 0.5);
+  --card: rgba(31, 27, 25, 0.96);
+  --gold: #dcb062;
   color-scheme: dark;
 }
 
@@ -45,6 +51,28 @@ body {
   display: block;
   touch-action: none;
   cursor: pointer;
+}
+
+/* Soft veils at the top and bottom of the screen, so the words read over the brightest hall. */
+.veil::before,
+.veil::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.veil::before {
+  top: 0;
+  height: 130px;
+  background: linear-gradient(to bottom, var(--veil), transparent);
+}
+
+.veil::after {
+  bottom: 0;
+  height: 210px;
+  background: linear-gradient(to top, var(--veil), transparent);
 }
 
 #fade {
@@ -86,7 +114,8 @@ body {
   font-size: 10px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink); /* the hour and the next prayer: kept legible over the brightest arches */
+  text-shadow: 0 0 3px var(--halo), 0 0 12px var(--halo);
 }
 
 .controls {
@@ -150,6 +179,8 @@ button:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
+
+.guide-open .mark { display: none; }
 
 .panel {
   position: fixed;
@@ -334,9 +365,27 @@ button:focus-visible {
   color: var(--muted);
 }
 
+.progress {
+  width: 132px;
+  height: 2px;
+  margin: 9px auto 0;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.6s var(--ease);
+}
+
 .rose-name {
-  height: 0;
-  overflow: visible;
+  min-height: 15px;
+  margin-top: 9px !important;
   font-size: 10px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -351,15 +400,129 @@ button:focus-visible {
 }
 
 .hint {
-  margin-top: 12px !important;
+  min-height: 15px;
+  margin-top: 4px !important;
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
-  transition: opacity 1.2s var(--ease) 2.5s;
+  color: var(--ink);
+  transition: opacity 0.5s var(--ease);
 }
 
-.hint.gone { opacity: 0; }
+/* An empty hint fades out with its last words, after a moment to read them. */
+.hint.gone {
+  opacity: 0;
+  transition: opacity 1.2s var(--ease) 1.5s;
+}
+
+/* The guide: how the hall works, over the dimmed hall. */
+.guide {
+  width: min(440px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 30px 80px rgba(43, 37, 33, 0.25);
+  overflow: auto;
+}
+
+.guide[open] { animation: guide-in 0.6s var(--ease); }
+
+@keyframes guide-in {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+.guide::backdrop {
+  background: rgba(238, 227, 209, 0.4);
+}
+
+:root[data-dark] .guide::backdrop {
+  background: rgba(10, 8, 12, 0.5);
+}
+
+.guide-card { padding: 26px 26px 22px; }
+
+.guide-card p { margin: 0; }
+
+.guide-kicker {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.guide-title {
+  margin: 8px 0 14px;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-weight: 400;
+  font-size: 34px;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.guide-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.guide-steps li {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.guide-label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.guide-steps li > span:last-child {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 19px;
+  line-height: 1.28;
+}
+
+.guide-note {
+  padding: 12px 0 18px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.guide-note b {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.begin:focus-visible {
+  outline-color: var(--gold);
+  outline-offset: 3px;
+}
+
+.begin {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--cream);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
 
 .nogl {
   position: fixed;
@@ -384,6 +547,17 @@ button:focus-visible {
   .seg-label { display: none; }
   .seg button, .pill { padding: 0 12px; }
 
+  /* The Guide button becomes a "?" so the controls stay on one line. */
+  .guide-open { width: 44px; padding: 0; }
+  .guide-open .word { display: none; }
+  .guide-open .mark {
+    display: inline;
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-size: 21px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
   /* The panel rises from the bottom, clear of the stacked header. */
   .panel {
     top: auto;
@@ -395,6 +569,24 @@ button:focus-visible {
   }
 }
 
+/* Phones on their side: smaller words, so the hall (and the dome) keep the screen. */
+@media (max-height: 500px) {
+  .dhikr { bottom: max(10px, env(safe-area-inset-bottom)); }
+  .phrase { font-size: 28px; }
+  .gloss { margin-top: 3px !important; }
+  .count { margin-top: 4px !important; font-size: 21px; }
+  .progress { margin-top: 5px; }
+  .rose-name { margin-top: 5px !important; }
+  /* and the guide keeps to its four steps, so Begin stays in view */
+  .guide-card { padding: 16px 22px 14px; }
+  .guide-kicker, .guide-note { display: none; }
+  .guide-title { font-size: 28px; margin: 0 0 8px; }
+  .guide-steps { margin-bottom: 12px; }
+  .guide-steps li { padding: 6px 0; }
+  .guide-steps li > span:last-child { font-size: 17px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .hint, .seg button, .rose-name { transition: none; }
+  .hint, .hint.gone, .seg button, .rose-name, .progress i { transition: none; }
+  .guide[open] { animation: none; }
 }

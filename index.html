@@ -13,7 +13,7 @@
   <meta property="og:image" content="https://jameel7007.github.io/endless-rose/og.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Looking up into a dome laid with a 16-fold zellige rose in indigo, turquoise and gold, an oculus at its centre and a lantern hanging below, in late-afternoon light.">
+  <meta property="og:image:alt" content="Looking up into a dome laid with a 16-fold zellige rose in deep blue, green, ochre and cream with a terracotta rim, an oculus at its centre and a lamp hanging below, in afternoon light.">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='%23b8862f'%3E%3Crect x='8' y='8' width='16' height='16'/%3E%3Crect x='8' y='8' width='16' height='16' transform='rotate(45 16 16)'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,6 +23,7 @@
 </head>
 <body>
   <canvas id="hall" aria-label="An endless prayer hall of plaster columns and horseshoe arches, lit by the hour of the day, with a nave leading to a glowing mihrab under a dome"></canvas>
+  <div class="veil" aria-hidden="true"></div>
   <div id="fade" aria-hidden="true"></div>
 
   <header class="top">
@@ -38,6 +39,9 @@
       </div>
       <button type="button" id="light" class="pill" aria-expanded="false" aria-controls="light-panel">Light</button>
       <button type="button" id="reset" class="pill">Reset</button>
+      <button type="button" id="guide-open" class="pill guide-open" aria-haspopup="dialog" aria-label="Guide: how the hall works">
+        <span class="word" aria-hidden="true">Guide</span><span class="mark" aria-hidden="true">?</span>
+      </button>
     </div>
   </header>
 
@@ -64,9 +68,25 @@
     <p id="phrase" class="phrase">SubhanAllah</p>
     <p id="gloss" class="gloss">Glory be to God</p>
     <p class="count" aria-live="polite"><span id="n">0</span> <span id="of" class="of">/ 33</span></p>
+    <div class="progress" aria-hidden="true"><i id="progress"></i></div>
     <p id="rose" class="rose-name" aria-live="polite"></p>
     <p id="hint" class="hint"></p>
   </section>
+
+  <dialog id="guide" class="guide" aria-labelledby="guide-title">
+    <div class="guide-card">
+      <p class="guide-kicker">Dhikr in an endless prayer hall</p>
+      <h1 id="guide-title" class="guide-title">Endless Rose</h1>
+      <ol class="guide-steps">
+        <li><span class="guide-label">Count</span><span id="guide-count">Click anywhere, or press Space, for each dhikr.</span></li>
+        <li><span class="guide-label">Walk</span><span>Each count carries you one bay down the nave, toward the mihrab.</span></li>
+        <li><span class="guide-label">Arrive</span><span>At 33 you stand under the dome as its rose is completed. The next count begins the next phrase.</span></li>
+        <li><span class="guide-label">Look</span><span id="guide-look">Move the pointer to look around.</span></li>
+      </ol>
+      <p class="guide-note">The light is the sun where you are, through the day. <b>Light</b> shows today’s prayer times; <b>Ahead</b> keeps the mihrab on the horizon.</p>
+      <button type="button" id="begin" class="begin">Begin</button>
+    </div>
+  </dialog>
 
   <p id="nogl" class="nogl" hidden>This hall needs WebGL, which this browser has turned off.</p>
   <script type="module" src="./src/main.js"></script>

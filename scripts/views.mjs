@@ -9,7 +9,7 @@
 // colour: the colour layers compared, each alone, none and all, in the same two views, with a
 // labelled sheet of each view (capture/views/colour-*.png). T=14:30 sets the hour.
 import { mkdirSync, readFileSync } from 'fs';
-import { collectConsole, launch } from './lib/browser.mjs';
+import { begin, collectConsole, launch } from './lib/browser.mjs';
 
 const url = 'http://localhost:5197/';
 const out = new URL('../capture/views/', import.meta.url).pathname;
@@ -42,6 +42,7 @@ if (run('day')) {
   logs.push(collectConsole(page));
   await page.goto(url);
   await page.waitForSelector('html[data-ready="1"]');
+  await begin(page);
   await page.click('#light');
   await page.waitForFunction(() => document.querySelector('#times time')?.textContent);
   const times = Object.fromEntries(await page.$$eval('#times li', lis => lis.map(li => [li.dataset.p, li.querySelector('time').textContent])));
@@ -50,6 +51,7 @@ if (run('day')) {
   for (const [name, t] of Object.entries(moments)) {
     await page.goto(`${url}?t=${hhmm(t)}`);
     await page.waitForSelector('html[data-ready="1"]');
+    await begin(page);
     await page.mouse.move(640, 400);
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${out}day-${name}.png` });
@@ -65,6 +67,7 @@ if (run('arrive')) {
     const tag = t.replace(':', '');
     await page.goto(`${url}?t=${t}`);
     await page.waitForSelector('html[data-ready="1"]');
+    await begin(page);
     await page.mouse.move(640, 400);
     await count(page, 26);
     await settle(page);
@@ -74,10 +77,11 @@ if (run('arrive')) {
     await page.screenshot({ path: `${out}arrive-${tag}-32.png` });
     await count(page, 1);
     await settle(page);
-    await page.waitForTimeout(6000); // the gaze rises to the rose
+    await page.waitForTimeout(6000); // the camera turns up to the rose
     await page.screenshot({ path: `${out}arrive-${tag}-33.png` });
     const r = await page.evaluate(() => window.__hall.rose);
-    console.log(`arrive at ${t}: ${r.name}, laid ${r.laid.toFixed(3)}, tilt ${(await page.evaluate(() => window.__hall.state.tilt)).toFixed(2)} rad`);
+    const v = await page.evaluate(() => window.__hall.view);
+    console.log(`arrive at ${t}: ${r.name}, laid ${r.laid.toFixed(3)}, view up ${(v.pitch * 180 / Math.PI).toFixed(1)}°, fov ${v.fov.toFixed(1)}°`);
   }
   await page.close();
 }
@@ -90,6 +94,7 @@ if (run('phone')) {
     const tag = t.replace(':', '');
     await page.goto(`${url}?t=${t}`);
     await page.waitForSelector('html[data-ready="1"]');
+    await begin(page, { tap: true });
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${out}phone-${tag}.png` });
     await page.tap('#light');
@@ -101,20 +106,21 @@ if (run('phone')) {
 
 if (run('readme')) {
   const docs = new URL('../docs/readme/', import.meta.url).pathname;
-  const clean = page => page.addStyleTag({ content: '.top, .dhikr, .panel { display: none !important; }' });
+  const clean = page => page.addStyleTag({ content: '.top, .dhikr, .panel, .veil { display: none !important; }' });
   const shoot = async (w, h, t, counts, file, quality = 84) => {
     const page = await browser.newPage({ viewport: { width: w, height: h } });
     logs.push(collectConsole(page));
     await page.goto(`${url}?t=${t}`);
     await page.waitForSelector('html[data-ready="1"]');
+    await begin(page);
+    await clean(page); // before arriving, so the dome shot is framed for the whole picture
     await page.mouse.move(w / 2, h / 2);
     if (counts) {
       await count(page, counts);
       await settle(page);
-      if (counts === 33) await page.waitForTimeout(6500); // the gaze rises to the rose
+      if (counts === 33) await page.waitForTimeout(6500); // the camera turns up to the rose
     }
     await page.waitForTimeout(1200);
-    await clean(page);
     await page.screenshot({ path: file, type: 'jpeg', quality });
     await page.close();
     console.log(file.split('/').slice(-2).join('/'));
@@ -138,12 +144,13 @@ if (run('colour')) {
       logs.push(collectConsole(page));
       await page.goto(`${url}?t=${t}&colour=${colour}`);
       await page.waitForSelector('html[data-ready="1"]');
+      await begin(page);
       await page.mouse.move(640, 400);
       await count(page, counts);
       await settle(page);
       await page.mouse.move(...look);
       await page.waitForTimeout(2600);
-      await page.addStyleTag({ content: '.top, .dhikr { display: none !important; }' });
+      await page.addStyleTag({ content: '.top, .dhikr, .veil { display: none !important; }' });
       const file = `${out}colour-${view}-${colour}.png`;
       await page.screenshot({ path: file });
       files.push([file, label]);

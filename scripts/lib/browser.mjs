@@ -27,3 +27,14 @@ export function collectConsole(page) {
   page.on('pageerror', e => log.push(`[pageerror] ${e.message}`));
   return log;
 }
+
+/**
+ * Close the guide that opens on a first visit, as a visitor would, with its Begin button (a tap
+ * on a touch screen). Returns false when it wasn't open (a later visit in the same browser).
+ */
+export async function begin(page, { tap = false } = {}) {
+  if (!(await page.isVisible('#guide'))) return false;
+  await (tap ? page.tap('#begin') : page.click('#begin'));
+  await page.waitForSelector('#guide', { state: 'hidden' });
+  return true;
+}
